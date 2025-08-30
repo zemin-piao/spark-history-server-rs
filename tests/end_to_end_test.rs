@@ -13,7 +13,7 @@ use spark_history_server::{
 async fn test_end_to_end_with_real_data() -> Result<()> {
     // Use the test event logs directory
     let config = HistoryConfig {
-        log_directory: "/tmp/spark-events".to_string(),
+        log_directory: "./test-data/spark-events".to_string(),
         max_applications: 100,
         update_interval_seconds: 60,
         max_apps_per_request: 50,
@@ -109,7 +109,7 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
 #[tokio::test]
 async fn test_performance_and_concurrent_requests() -> Result<()> {
     let config = HistoryConfig {
-        log_directory: "/tmp/spark-events".to_string(),
+        log_directory: "./test-data/spark-events".to_string(),
         max_applications: 100,
         update_interval_seconds: 60,
         max_apps_per_request: 50,

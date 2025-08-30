@@ -5,7 +5,7 @@ max_applications = 1000
 
 [history]
 # Path to Spark event logs directory (can be local filesystem or HDFS)
-log_directory = "/tmp/spark-events"
+log_directory = "./spark-events"
 
 # Maximum number of applications to retain in memory
 max_applications = 1000

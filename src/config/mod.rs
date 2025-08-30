@@ -42,7 +42,7 @@ impl Default for Settings {
                 max_applications: 1000,
             },
             history: HistoryConfig {
-                log_directory: "/tmp/spark-events".to_string(),
+                log_directory: "./test-data/spark-events".to_string(),
                 max_applications: 1000,
                 update_interval_seconds: 10,
                 max_apps_per_request: 100,
