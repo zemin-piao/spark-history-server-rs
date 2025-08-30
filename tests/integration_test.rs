@@ -19,6 +19,8 @@ async fn test_integration_full_workflow() -> Result<()> {
         update_interval_seconds: 60, // Longer interval for test
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None, // Disable cache for test
+        enable_cache: false,
     };
 
     // Create history provider
@@ -146,6 +148,8 @@ async fn test_date_filtering() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     };
 
     let history_provider = HistoryProvider::new(config).await?;
@@ -189,6 +193,8 @@ async fn test_cors_headers() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     };
 
     let history_provider = HistoryProvider::new(config).await?;

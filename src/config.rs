@@ -31,6 +31,12 @@ pub struct HistoryConfig {
     
     /// Enable event log compression support
     pub compression_enabled: bool,
+    
+    /// Directory for RocksDB cache storage
+    pub cache_directory: Option<String>,
+    
+    /// Enable persistent caching with RocksDB
+    pub enable_cache: bool,
 }
 
 impl Default for Settings {
@@ -47,6 +53,8 @@ impl Default for Settings {
                 update_interval_seconds: 10,
                 max_apps_per_request: 100,
                 compression_enabled: true,
+                cache_directory: Some("./cache/rocksdb".to_string()),
+                enable_cache: true,
             },
         }
     }

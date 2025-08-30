@@ -18,6 +18,8 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     };
 
     println!("Creating history provider with test data...");
@@ -114,6 +116,8 @@ async fn test_performance_and_concurrent_requests() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     };
 
     let history_provider = HistoryProvider::new(config).await?;

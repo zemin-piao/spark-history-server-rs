@@ -7,6 +7,8 @@ pub fn mock_hdfs_config() -> HistoryConfig {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     }
 }
 
@@ -17,6 +19,8 @@ pub fn test_hdfs_config() -> HistoryConfig {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     }
 }
 
@@ -27,6 +31,8 @@ pub fn large_scale_hdfs_config() -> HistoryConfig {
         update_interval_seconds: 300,
         max_apps_per_request: 1000,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     }
 }
 

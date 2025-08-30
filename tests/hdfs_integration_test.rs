@@ -103,6 +103,8 @@ async fn test_hdfs_integration_with_history_provider() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     };
 
     println!("✅ HDFS integration with HistoryProvider test setup completed");
@@ -121,6 +123,8 @@ async fn test_hdfs_api_endpoints() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     };
 
     let history_provider = HistoryProvider::new(config).await?;
@@ -207,6 +211,8 @@ async fn test_hdfs_compression_support() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
+        cache_directory: None,
+        enable_cache: false,
     };
 
     let _provider = HistoryProvider::new(config).await?;

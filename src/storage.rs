@@ -2,14 +2,12 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::{
-    collections::HashMap,
     fs,
     path::Path,
     sync::Arc,
     time::SystemTime,
 };
 use tokio::{
-    sync::RwLock,
     time::{interval, Duration},
 };
 use tracing::{debug, error, info, warn};
@@ -19,14 +17,16 @@ use crate::models::{ApplicationInfo, ApplicationStatus};
 
 mod event_log;
 pub mod file_reader;
+pub mod hybrid_store;
 
 use event_log::EventLogParser;
 pub use file_reader::FileReader;
+pub use hybrid_store::{ApplicationStore, HybridStore, InMemoryStore, RocksDbStore};
 
 /// History provider that manages Spark application history
 pub struct HistoryProvider {
     config: HistoryConfig,
-    applications: Arc<RwLock<HashMap<String, ApplicationInfo>>>,
+    store: Arc<HybridStore>,
     file_reader: Arc<dyn FileReader>,
     event_parser: EventLogParser,
 }
@@ -36,15 +36,35 @@ impl HistoryProvider {
         let file_reader: Arc<dyn FileReader> = Arc::new(file_reader::LocalFileReader::new());
         let event_parser = EventLogParser::new();
 
+        // Initialize hybrid store
+        let mut store = HybridStore::new();
+        
+        // Set up persistent storage if enabled
+        if config.enable_cache {
+            if let Some(ref cache_dir) = config.cache_directory {
+                info!("Initializing persistent cache at: {}", cache_dir);
+                std::fs::create_dir_all(cache_dir)?;
+                store.initialize_disk_store(cache_dir).await?;
+            } else {
+                warn!("Cache enabled but no cache directory specified. Using in-memory only.");
+            }
+        }
+
         let provider = Self {
             config: config.clone(),
-            applications: Arc::new(RwLock::new(HashMap::new())),
+            store: Arc::new(store),
             file_reader,
             event_parser,
         };
 
-        // Initial scan
+        // Initial scan - this will load into memory first
         provider.scan_event_logs_internal().await?;
+
+        // Switch to persistent storage after initial load
+        if config.enable_cache && config.cache_directory.is_some() {
+            info!("Switching to persistent storage after initial load");
+            provider.store.switch_to_persistent().await?;
+        }
 
         // Start background refresh task
         let provider_clone = provider.clone();
@@ -72,8 +92,7 @@ impl HistoryProvider {
         min_end_date: Option<DateTime<Utc>>,
         max_end_date: Option<DateTime<Utc>>,
     ) -> Result<Vec<ApplicationInfo>> {
-        let applications = self.applications.read().await;
-        let mut results: Vec<ApplicationInfo> = applications.values().cloned().collect();
+        let mut results = self.store.list().await?;
 
         // Apply filters
         if let Some(status_filters) = &status_filter {
@@ -123,8 +142,7 @@ impl HistoryProvider {
     }
 
     pub async fn get_application(&self, app_id: &str) -> Result<Option<ApplicationInfo>> {
-        let applications = self.applications.read().await;
-        Ok(applications.get(app_id).cloned())
+        self.store.get(app_id).await
     }
 
     async fn scan_event_logs_internal(&self) -> Result<()> {
@@ -143,16 +161,14 @@ impl HistoryProvider {
             if path.is_dir() {
                 // Single application directory
                 if let Ok(app_info) = self.parse_application_directory(&path).await {
-                    let mut applications = self.applications.write().await;
-                    applications.insert(app_info.id.clone(), app_info);
+                    self.store.put(&app_info.id.clone(), app_info).await?;
                     app_count += 1;
                 }
             } else if path.extension().and_then(|s| s.to_str()) == Some("inprogress") 
                 || path.to_string_lossy().contains("eventLog") {
                 // Single event log file
                 if let Ok(app_info) = self.parse_event_log_file(&path).await {
-                    let mut applications = self.applications.write().await;
-                    applications.insert(app_info.id.clone(), app_info);
+                    self.store.put(&app_info.id.clone(), app_info).await?;
                     app_count += 1;
                 }
             }
@@ -265,7 +281,7 @@ impl Clone for HistoryProvider {
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
-            applications: Arc::clone(&self.applications),
+            store: Arc::clone(&self.store),
             file_reader: Arc::clone(&self.file_reader),
             event_parser: self.event_parser.clone(),
         }

@@ -23,6 +23,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             update_interval_seconds: 10,
             max_apps_per_request: 50,
             compression_enabled: true,
+            cache_directory: None,
+            enable_cache: false,
         },
     };
 

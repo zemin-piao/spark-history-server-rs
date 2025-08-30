@@ -1,0 +1,20 @@
+[server]
+host = "0.0.0.0"
+port = 18080
+max_applications = 1000
+
+[history]
+# Path to Spark event logs directory
+log_directory = "/tmp/spark-events"
+# Maximum number of applications to retain in memory
+max_applications = 1000
+# Update interval in seconds
+update_interval_seconds = 10
+# Maximum number of applications to return per request
+max_apps_per_request = 100
+# Enable event log compression support
+compression_enabled = true
+# Directory for RocksDB cache storage
+cache_directory = "./cache/rocksdb"
+# Enable persistent caching with RocksDB
+enable_cache = true
