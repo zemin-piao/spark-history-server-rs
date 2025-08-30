@@ -1,0 +1,60 @@
+[package]
+name = "spark-history-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <you@example.com>"]
+description = "A high-performance read-only Spark History Server API implementation in Rust"
+
+[dependencies]
+# Web framework
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP client for testing
+reqwest = { version = "0.11", features = ["json"] }
+
+# File system and compression
+flate2 = "1.0"
+zip = "0.6"
+
+# Hadoop/HDFS integration (if needed)
+hdfs-native = { version = "0.10", optional = true }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Configuration
+config = "0.14"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+
+# TOML parsing for config
+toml = "0.8"
+
+# Async trait support
+async-trait = "0.1"
+
+[dev-dependencies]
+# Testing dependencies
+tokio-test = "0.4"
+
+[features]
+default = []
+hdfs = ["dep:hdfs-native"]
+
+[[bin]]
+name = "spark-history-server"
+path = "src/main.rs"
