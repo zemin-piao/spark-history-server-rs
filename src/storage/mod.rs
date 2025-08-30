@@ -18,10 +18,10 @@ use crate::config::HistoryConfig;
 use crate::models::{ApplicationInfo, ApplicationStatus};
 
 mod event_log;
-mod file_reader;
+pub mod file_reader;
 
 use event_log::EventLogParser;
-use file_reader::FileReader;
+pub use file_reader::FileReader;
 
 /// History provider that manages Spark application history
 pub struct HistoryProvider {
@@ -44,7 +44,7 @@ impl HistoryProvider {
         };
 
         // Initial scan
-        provider.scan_event_logs().await?;
+        provider.scan_event_logs_internal().await?;
 
         // Start background refresh task
         let provider_clone = provider.clone();
@@ -53,6 +53,14 @@ impl HistoryProvider {
         });
 
         Ok(provider)
+    }
+
+    pub fn set_file_reader(&mut self, file_reader: Arc<dyn FileReader>) {
+        self.file_reader = file_reader;
+    }
+
+    pub async fn scan_event_logs(&self) -> Result<()> {
+        self.scan_event_logs_internal().await
     }
 
     pub async fn get_applications(
@@ -119,7 +127,7 @@ impl HistoryProvider {
         Ok(applications.get(app_id).cloned())
     }
 
-    async fn scan_event_logs(&self) -> Result<()> {
+    async fn scan_event_logs_internal(&self) -> Result<()> {
         let log_dir = Path::new(&self.config.log_directory);
         if !log_dir.exists() {
             return Err(anyhow!("Log directory does not exist: {}", self.config.log_directory));
@@ -246,7 +254,7 @@ impl HistoryProvider {
         
         loop {
             interval.tick().await;
-            if let Err(e) = self.scan_event_logs().await {
+            if let Err(e) = self.scan_event_logs_internal().await {
                 error!("Error during background refresh: {}", e);
             }
         }
