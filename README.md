@@ -1,5 +1,7 @@
 # Spark History Server (Rust)
 
+⚠️ **This project is a Work In Progress (WIP) and not production ready** ⚠️
+
 A high-performance, read-only Spark History Server API implementation in Rust. This server provides REST API endpoints for querying Spark application history without serving the web UI components.
 
 ## Features
