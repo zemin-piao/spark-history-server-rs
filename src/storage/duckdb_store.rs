@@ -158,6 +158,7 @@ impl DuckDbStore {
         limit: Option<usize>,
         min_date: Option<&str>,
         max_date: Option<&str>,
+        _status: Option<&str>, // TODO: implement status filtering
     ) -> Result<Vec<ApplicationInfo>> {
         let conn = self.connection.lock().await;
 
@@ -283,12 +284,12 @@ impl DuckDbStore {
 
     /// List all applications (compatibility method)
     pub async fn list(&self) -> Result<Vec<ApplicationInfo>> {
-        self.get_applications(None, None, None).await
+        self.get_applications(None, None, None, None).await
     }
 
     /// Get a specific application (compatibility method)
     pub async fn get(&self, app_id: &str) -> Result<Option<ApplicationInfo>> {
-        let apps = self.get_applications(Some(1), None, None).await?;
+        let apps = self.get_applications(Some(1), None, None, None).await?;
         Ok(apps.into_iter().find(|app| app.id == app_id))
     }
 
@@ -445,6 +446,24 @@ impl DuckDbStore {
         }
 
         Ok(executors)
+    }
+
+    /// Get total count of events in the database
+    #[allow(dead_code)]
+    pub async fn count_events(&self) -> Result<i64> {
+        let conn = self.connection.lock().await;
+        let mut stmt = conn.prepare("SELECT COUNT(*) FROM events")?;
+        let count: i64 = stmt.query_row([], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    /// Get the maximum event ID from the database
+    #[allow(dead_code)]
+    pub async fn get_max_event_id(&self) -> Result<Option<i64>> {
+        let conn = self.connection.lock().await;
+        let mut stmt = conn.prepare("SELECT MAX(id) FROM events")?;
+        let max_id: Option<i64> = stmt.query_row([], |row| row.get(0))?;
+        Ok(max_id)
     }
 
     /// Clear all data from the database with explicit safety check

@@ -167,12 +167,23 @@ impl HdfsReader {
 
     /// Get file info for monitoring
     pub async fn get_file_info(&self, file_path: &str) -> Result<HdfsFileInfo> {
-        // Mock file info
+        let path = std::path::Path::new(file_path);
+        let metadata = tokio::fs::metadata(path)
+            .await
+            .map_err(|e| anyhow!("Failed to get metadata for {}: {}", file_path, e))?;
+
+        let modification_time = metadata
+            .modified()
+            .map_err(|e| anyhow!("Failed to get modification time for {}: {}", file_path, e))?
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| anyhow!("Invalid modification time for {}: {}", file_path, e))?
+            .as_millis() as i64;
+
         Ok(HdfsFileInfo {
             path: file_path.to_string(),
-            size: 1024,
-            modification_time: chrono::Utc::now().timestamp_millis(),
-            is_directory: false,
+            size: metadata.len() as i64,
+            modification_time,
+            is_directory: metadata.is_dir(),
         })
     }
 }
@@ -184,6 +195,16 @@ pub struct HdfsFileInfo {
     pub size: i64,
     pub modification_time: i64,
     pub is_directory: bool,
+}
+
+/// File metadata for tracking changes
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FileMetadata {
+    pub path: String,
+    pub last_processed: i64,
+    pub file_size: i64,
+    pub last_index: Option<i64>,
+    pub is_complete: bool,
 }
 
 /// Configuration for HDFS connection
