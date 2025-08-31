@@ -9,18 +9,13 @@ use spark_history_server::{
     storage::HistoryProvider,
 };
 
+mod test_config;
+use test_config::create_test_config;
+
 #[tokio::test]
 async fn test_end_to_end_with_real_data() -> Result<()> {
     // Use the test event logs directory
-    let config = HistoryConfig {
-        log_directory: "./test-data/spark-events".to_string(),
-        max_applications: 100,
-        update_interval_seconds: 60,
-        max_apps_per_request: 50,
-        compression_enabled: true,
-        cache_directory: None,
-        enable_cache: false,
-    };
+    let (config, _) = create_test_config();
 
     println!("Creating history provider with test data...");
     let history_provider = HistoryProvider::new(config).await?;
@@ -110,15 +105,8 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
 
 #[tokio::test]
 async fn test_performance_and_concurrent_requests() -> Result<()> {
-    let config = HistoryConfig {
-        log_directory: "./test-data/spark-events".to_string(),
-        max_applications: 100,
-        update_interval_seconds: 60,
-        max_apps_per_request: 50,
-        compression_enabled: true,
-        cache_directory: None,
-        enable_cache: false,
-    };
+    let test_id = format!("perf_test_{}", std::process::id());
+    let (config, _) = create_test_config();
 
     let history_provider = HistoryProvider::new(config).await?;
     let app = create_app(history_provider).await?;

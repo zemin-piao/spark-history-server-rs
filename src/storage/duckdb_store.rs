@@ -17,6 +17,16 @@ impl DuckDbStore {
     pub async fn new(db_path: &Path) -> Result<Self> {
         let conn = Connection::open(db_path)?;
         
+        // Install and load JSON extension first - handle potential failures gracefully
+        if let Err(e) = conn.execute_batch("INSTALL 'json'") {
+            warn!("Failed to install JSON extension (may already be installed): {}", e);
+        }
+        
+        if let Err(e) = conn.execute_batch("LOAD 'json'") {
+            warn!("Failed to load JSON extension: {}", e);
+            return Err(anyhow!("JSON extension is required but could not be loaded: {}", e));
+        }
+        
         // Create the events table with schema
         conn.execute_batch(
             r#"

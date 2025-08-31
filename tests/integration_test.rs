@@ -9,19 +9,14 @@ use spark_history_server::{
     models::{ApplicationInfo, VersionInfo},
     storage::HistoryProvider,
 };
+mod test_config;
+use test_config::create_test_config;
+
 
 #[tokio::test]
 async fn test_integration_full_workflow() -> Result<()> {
     // Setup test configuration
-    let config = HistoryConfig {
-        log_directory: "./examples".to_string(),
-        max_applications: 100,
-        update_interval_seconds: 60, // Longer interval for test
-        max_apps_per_request: 50,
-        compression_enabled: true,
-        cache_directory: None, // Disable cache for test
-        enable_cache: false,
-    };
+    let (config, _) = create_test_config();
 
     // Create history provider
     let history_provider = HistoryProvider::new(config).await?;
@@ -142,15 +137,7 @@ async fn test_integration_full_workflow() -> Result<()> {
 
 #[tokio::test]
 async fn test_date_filtering() -> Result<()> {
-    let config = HistoryConfig {
-        log_directory: "./examples".to_string(),
-        max_applications: 100,
-        update_interval_seconds: 60,
-        max_apps_per_request: 50,
-        compression_enabled: true,
-        cache_directory: None,
-        enable_cache: false,
-    };
+    let (config, _) = create_test_config();
 
     let history_provider = HistoryProvider::new(config).await?;
     let app = create_app(history_provider).await?;
@@ -187,15 +174,7 @@ async fn test_date_filtering() -> Result<()> {
 
 #[tokio::test]
 async fn test_cors_headers() -> Result<()> {
-    let config = HistoryConfig {
-        log_directory: "./examples".to_string(),
-        max_applications: 100,
-        update_interval_seconds: 60,
-        max_apps_per_request: 50,
-        compression_enabled: true,
-        cache_directory: None,
-        enable_cache: false,
-    };
+    let (config, _) = create_test_config();
 
     let history_provider = HistoryProvider::new(config).await?;
     let app = create_app(history_provider).await?;

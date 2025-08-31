@@ -9,6 +9,10 @@ use spark_history_server::{
     storage::{file_reader::FileReader, HistoryProvider},
 };
 
+mod test_config;
+use test_config::create_test_config;
+
+
 #[cfg(feature = "hdfs")]
 use spark_history_server::storage::file_reader::HdfsFileReader;
 
@@ -117,15 +121,7 @@ async fn test_hdfs_integration_with_history_provider() -> Result<()> {
 async fn test_hdfs_api_endpoints() -> Result<()> {
     println!("Testing API endpoints with HDFS backend...");
 
-    let config = HistoryConfig {
-        log_directory: "./examples".to_string(),
-        max_applications: 100,
-        update_interval_seconds: 60,
-        max_apps_per_request: 50,
-        compression_enabled: true,
-        cache_directory: None,
-        enable_cache: false,
-    };
+    let (config, _) = create_test_config();
 
     let history_provider = HistoryProvider::new(config).await?;
 
@@ -205,15 +201,7 @@ async fn test_hdfs_compression_support() -> Result<()> {
         compressed_content.to_string(),
     );
 
-    let config = HistoryConfig {
-        log_directory: "./examples".to_string(),
-        max_applications: 100,
-        update_interval_seconds: 60,
-        max_apps_per_request: 50,
-        compression_enabled: true,
-        cache_directory: None,
-        enable_cache: false,
-    };
+    let (config, _) = create_test_config();
 
     let _provider = HistoryProvider::new(config).await?;
 
