@@ -16,7 +16,7 @@ impl MetadataStore {
     /// Create a new metadata store
     pub async fn new(metadata_path: &Path) -> Result<Self> {
         let metadata_file = metadata_path.join("file_metadata.json");
-        
+
         let store = Self {
             metadata_file: metadata_file.clone(),
             metadata: RwLock::new(HashMap::new()),
@@ -43,7 +43,7 @@ impl MetadataStore {
 
         let mut store_metadata = self.metadata.write().await;
         *store_metadata = metadata;
-        
+
         info!("Loaded {} file metadata records", store_metadata.len());
         Ok(())
     }

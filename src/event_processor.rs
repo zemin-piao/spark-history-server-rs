@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio::time::{interval, sleep, Duration};
 use tracing::{debug, error, info, warn};
 
-use crate::hdfs_reader::{HdfsConfig, HdfsReader, FileMetadata};
+use crate::hdfs_reader::{FileMetadata, HdfsConfig, HdfsReader};
 use crate::metadata_store::MetadataStore;
 use crate::spark_events::SparkEvent;
 use crate::storage::duckdb_store::{DuckDbStore, SparkEvent as DbSparkEvent};
@@ -29,7 +29,15 @@ impl EventProcessor {
         batch_size: usize,
         flush_interval_secs: u64,
     ) -> Result<Self> {
-        Self::new_with_scan_interval(hdfs_config, duckdb_path, metadata_path, batch_size, flush_interval_secs, 30).await
+        Self::new_with_scan_interval(
+            hdfs_config,
+            duckdb_path,
+            metadata_path,
+            batch_size,
+            flush_interval_secs,
+            30,
+        )
+        .await
     }
 
     /// Create a new event processor with custom scan interval (useful for testing)
@@ -110,11 +118,17 @@ impl EventProcessor {
                         // Get current file info
                         if let Ok(file_info) = self.hdfs_reader.get_file_info(&file_path).await {
                             // Check if file should be reloaded based on size
-                            let should_reload = self.metadata_store.should_reload_file(&file_path, file_info.size).await;
-                            debug!("File: {} - Size: {}, Should reload: {}", file_path, file_info.size, should_reload);
+                            let should_reload = self
+                                .metadata_store
+                                .should_reload_file(&file_path, file_info.size)
+                                .await;
+                            debug!(
+                                "File: {} - Size: {}, Should reload: {}",
+                                file_path, file_info.size, should_reload
+                            );
                             if should_reload {
                                 info!("Processing changed/new file: {}", file_path);
-                                
+
                                 match self.hdfs_reader.read_events(&file_path, &app_id).await {
                                     Ok(events) => {
                                         total_events += events.len();
@@ -124,10 +138,16 @@ impl EventProcessor {
                                         info!("INCREMENTAL: Sending {} events from {} to batch writer", events.len(), file_path);
                                         for (i, event) in events.iter().enumerate() {
                                             if let Err(e) = event_tx.send(event.clone()) {
-                                                error!("Failed to send event {} to batch writer: {}", i, e);
+                                                error!(
+                                                    "Failed to send event {} to batch writer: {}",
+                                                    i, e
+                                                );
                                             }
                                         }
-                                        info!("INCREMENTAL: Finished sending events from {}", file_path);
+                                        info!(
+                                            "INCREMENTAL: Finished sending events from {}",
+                                            file_path
+                                        );
 
                                         // Update metadata for this file
                                         let metadata = FileMetadata {
@@ -138,8 +158,13 @@ impl EventProcessor {
                                             is_complete: !file_path.ends_with(".inprogress"),
                                         };
 
-                                        if let Err(e) = self.metadata_store.update_metadata(metadata).await {
-                                            error!("Failed to update metadata for {}: {}", file_path, e);
+                                        if let Err(e) =
+                                            self.metadata_store.update_metadata(metadata).await
+                                        {
+                                            error!(
+                                                "Failed to update metadata for {}: {}",
+                                                file_path, e
+                                            );
                                         }
                                     }
                                     Err(e) => {
@@ -181,7 +206,9 @@ impl EventProcessor {
 
                 debug!("Starting periodic incremental scan");
 
-                if let Err(e) = Self::perform_incremental_scan(&hdfs_reader, &metadata_store, &event_tx).await {
+                if let Err(e) =
+                    Self::perform_incremental_scan(&hdfs_reader, &metadata_store, &event_tx).await
+                {
                     error!("Periodic incremental scan failed: {}", e);
                 }
             }
@@ -205,13 +232,16 @@ impl EventProcessor {
                 Ok(event_files) => {
                     for file_path in event_files {
                         files_checked += 1;
-                        
+
                         // Get current file info
                         if let Ok(file_info) = hdfs_reader.get_file_info(&file_path).await {
                             // Check if file should be reloaded based on size
-                            if metadata_store.should_reload_file(&file_path, file_info.size).await {
+                            if metadata_store
+                                .should_reload_file(&file_path, file_info.size)
+                                .await
+                            {
                                 debug!("Processing changed file: {}", file_path);
-                                
+
                                 match hdfs_reader.read_events(&file_path, &app_id).await {
                                     Ok(events) => {
                                         total_events += events.len();
@@ -220,7 +250,10 @@ impl EventProcessor {
                                         // Send events to batch writer
                                         for event in events {
                                             if let Err(e) = event_tx.send(event) {
-                                                error!("Failed to send event to batch writer: {}", e);
+                                                error!(
+                                                    "Failed to send event to batch writer: {}",
+                                                    e
+                                                );
                                             }
                                         }
 
@@ -233,8 +266,13 @@ impl EventProcessor {
                                             is_complete: !file_path.ends_with(".inprogress"),
                                         };
 
-                                        if let Err(e) = metadata_store.update_metadata(metadata).await {
-                                            error!("Failed to update metadata for {}: {}", file_path, e);
+                                        if let Err(e) =
+                                            metadata_store.update_metadata(metadata).await
+                                        {
+                                            error!(
+                                                "Failed to update metadata for {}: {}",
+                                                file_path, e
+                                            );
                                         }
                                     }
                                     Err(e) => {
@@ -258,7 +296,10 @@ impl EventProcessor {
                 total_events, files_processed, files_checked, duration
             );
         } else {
-            debug!("Incremental scan: no changes detected in {} files", files_checked);
+            debug!(
+                "Incremental scan: no changes detected in {} files",
+                files_checked
+            );
         }
 
         Ok(())
@@ -362,10 +403,16 @@ impl EventProcessor {
         match duckdb_store.insert_events_batch(batch.clone()).await {
             Ok(()) => {
                 let duration = start_time.elapsed();
-                info!("FLUSH_BATCH: Successfully flushed {} events to DuckDB in {:?}", batch_size, duration);
+                info!(
+                    "FLUSH_BATCH: Successfully flushed {} events to DuckDB in {:?}",
+                    batch_size, duration
+                );
             }
             Err(e) => {
-                error!("FLUSH_BATCH: Failed to flush {} events to DuckDB: {}", batch_size, e);
+                error!(
+                    "FLUSH_BATCH: Failed to flush {} events to DuckDB: {}",
+                    batch_size, e
+                );
                 // In production, might want to implement retry logic or dead letter queue
             }
         }
@@ -376,7 +423,7 @@ impl EventProcessor {
     /// Get processing statistics
     pub async fn get_stats(&self) -> ProcessingStats {
         let metadata_stats = self.metadata_store.get_stats().await;
-        
+
         ProcessingStats {
             total_events_processed: 0, // TODO: track this
             current_batch_size: 0,     // TODO: track this
