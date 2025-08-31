@@ -136,13 +136,23 @@ async fn get_application_jobs(
     Ok(Json(vec![]))
 }
 
-/// Get executors for a specific application (placeholder)
+/// Get executors for a specific application
 async fn get_application_executors(
+    State(provider): State<HistoryProvider>,
     Path(app_id): Path<String>,
-) -> Result<Json<Vec<serde_json::Value>>, StatusCode> {
+) -> Result<Json<Vec<crate::models::ExecutorSummary>>, StatusCode> {
     info!("GET /api/v1/applications/{}/executors", app_id);
-    // TODO: Implement executor parsing from event logs
-    Ok(Json(vec![]))
+    
+    match provider.get_executors(&app_id).await {
+        Ok(executors) => {
+            info!("Found {} executors for application: {}", executors.len(), app_id);
+            Ok(Json(executors))
+        }
+        Err(e) => {
+            tracing::error!("Failed to get executors for {}: {}", app_id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 /// Get stages for a specific application (placeholder)

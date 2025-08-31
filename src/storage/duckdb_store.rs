@@ -243,6 +243,159 @@ impl DuckDbStore {
         let spark_event = SparkEvent::from_json(raw_event, app_id, event_id)?;
         self.insert_events_batch(vec![spark_event]).await
     }
+
+    /// Clear all data from the database (for testing purposes only)
+    #[cfg(test)]
+    pub async fn cleanup_for_testing(&self) -> Result<()> {
+        let conn = self.connection.lock().await;
+        conn.execute_batch("DELETE FROM events")?;
+        info!("Cleared all events from DuckDB for testing");
+        Ok(())
+    }
+
+    /// Get executor summary for a specific application
+    pub async fn get_executor_summary(&self, app_id: &str) -> Result<Vec<crate::models::ExecutorSummary>> {
+        let conn = self.connection.lock().await;
+        
+        let query = r#"
+            WITH executor_events AS (
+                SELECT 
+                    COALESCE(
+                        JSON_EXTRACT_STRING(raw_data, '$.Executor ID'),
+                        JSON_EXTRACT_STRING(raw_data, '$.Task Info.Executor ID')
+                    ) as executor_id,
+                    JSON_EXTRACT_STRING(raw_data, '$.Executor Info.Host') as host,
+                    JSON_EXTRACT_STRING(raw_data, '$.Task Info.Host') as task_host,
+                    JSON_EXTRACT(raw_data, '$.Executor Info.Total Cores') as total_cores,
+                    JSON_EXTRACT(raw_data, '$.Executor Info.Max Memory') as max_memory,
+                    JSON_EXTRACT(raw_data, '$.Task Metrics.Executor Run Time') as run_time,
+                    JSON_EXTRACT(raw_data, '$.Task Metrics.JVM GC Time') as gc_time,
+                    JSON_EXTRACT(raw_data, '$.Task Metrics.Input Metrics.Bytes Read') as input_bytes,
+                    JSON_EXTRACT(raw_data, '$.Task Metrics.Shuffle Read Metrics.Total Bytes Read') as shuffle_read_bytes,
+                    JSON_EXTRACT(raw_data, '$.Task Metrics.Shuffle Write Metrics.Bytes Written') as shuffle_write_bytes,
+                    event_type,
+                    timestamp
+                FROM events 
+                WHERE app_id = ?
+                  AND (event_type LIKE '%Executor%' OR event_type LIKE '%Task%')
+            ),
+            executor_added AS (
+                SELECT 
+                    executor_id,
+                    COALESCE(host, task_host) as host_port,
+                    CAST(total_cores AS INTEGER) as total_cores,
+                    CAST(max_memory AS BIGINT) as max_memory,
+                    MIN(timestamp) as add_time
+                FROM executor_events
+                WHERE event_type = 'SparkListenerExecutorAdded'
+                GROUP BY executor_id, host, task_host, total_cores, max_memory
+            ),
+            executor_removed AS (
+                SELECT 
+                    executor_id,
+                    MAX(timestamp) as remove_time
+                FROM executor_events
+                WHERE event_type = 'SparkListenerExecutorRemoved'
+                GROUP BY executor_id
+            ),
+            task_metrics AS (
+                SELECT 
+                    executor_id,
+                    COUNT(*) as total_tasks,
+                    COUNT(CASE WHEN event_type = 'SparkListenerTaskEnd' THEN 1 END) as completed_tasks,
+                    SUM(CAST(run_time AS BIGINT)) as total_duration,
+                    SUM(CAST(gc_time AS BIGINT)) as total_gc_time,
+                    SUM(CAST(input_bytes AS BIGINT)) as total_input_bytes,
+                    SUM(CAST(shuffle_read_bytes AS BIGINT)) as total_shuffle_read,
+                    SUM(CAST(shuffle_write_bytes AS BIGINT)) as total_shuffle_write
+                FROM executor_events
+                WHERE event_type IN ('SparkListenerTaskStart', 'SparkListenerTaskEnd')
+                  AND executor_id IS NOT NULL
+                GROUP BY executor_id
+            )
+            SELECT 
+                COALESCE(ea.executor_id, tm.executor_id, 'driver') as id,
+                COALESCE(ea.host_port, 'localhost:0') as host_port,
+                CASE WHEN er.executor_id IS NULL THEN true ELSE false END as is_active,
+                0 as rdd_blocks,
+                0 as memory_used,
+                0 as disk_used,
+                COALESCE(ea.total_cores, 1) as total_cores,
+                COALESCE(ea.total_cores, 1) as max_tasks,
+                0 as active_tasks,
+                0 as failed_tasks,
+                COALESCE(tm.completed_tasks, 0) as completed_tasks,
+                COALESCE(tm.total_tasks, 0) as total_tasks,
+                COALESCE(tm.total_duration, 0) as total_duration,
+                COALESCE(tm.total_gc_time, 0) as total_gc_time,
+                COALESCE(tm.total_input_bytes, 0) as total_input_bytes,
+                COALESCE(tm.total_shuffle_read, 0) as total_shuffle_read,
+                COALESCE(tm.total_shuffle_write, 0) as total_shuffle_write,
+                false as is_excluded,
+                COALESCE(ea.max_memory, 1073741824) as max_memory,
+                0 as resource_profile_id
+            FROM executor_added ea
+            FULL OUTER JOIN executor_removed er ON ea.executor_id = er.executor_id
+            FULL OUTER JOIN task_metrics tm ON COALESCE(ea.executor_id, er.executor_id) = tm.executor_id
+            ORDER BY COALESCE(ea.executor_id, tm.executor_id, 'driver')
+        "#;
+
+        let mut stmt = conn.prepare(query)?;
+        let rows = stmt.query_map([app_id], |row| {
+            Ok(crate::models::ExecutorSummary {
+                id: row.get(0)?,
+                host_port: row.get(1)?,
+                is_active: row.get(2)?,
+                rdd_blocks: row.get(3)?,
+                memory_used: row.get(4)?,
+                disk_used: row.get(5)?,
+                total_cores: row.get(6)?,
+                max_tasks: row.get(7)?,
+                active_tasks: row.get(8)?,
+                failed_tasks: row.get(9)?,
+                completed_tasks: row.get(10)?,
+                total_tasks: row.get(11)?,
+                total_duration: row.get(12)?,
+                total_gc_time: row.get(13)?,
+                total_input_bytes: row.get(14)?,
+                total_shuffle_read: row.get(15)?,
+                total_shuffle_write: row.get(16)?,
+                is_excluded: row.get(17)?,
+                max_memory: row.get(18)?,
+                add_time: chrono::Utc::now(),
+                remove_time: None,
+                remove_reason: None,
+                executor_logs: std::collections::HashMap::new(),
+                memory_metrics: None,
+                attributes: std::collections::HashMap::new(),
+                resources: std::collections::HashMap::new(),
+                resource_profile_id: row.get(19)?,
+                excluded_in_stages: vec![],
+            })
+        })?;
+
+        let mut executors = Vec::new();
+        for row in rows {
+            executors.push(row?);
+        }
+
+        Ok(executors)
+    }
+
+    /// Clear all data from the database with explicit safety check
+    /// Only works when ENABLE_DB_CLEANUP environment variable is set to "true"
+    pub async fn cleanup_database(&self) -> Result<()> {
+        if std::env::var("ENABLE_DB_CLEANUP").unwrap_or_default() != "true" {
+            return Err(anyhow::anyhow!(
+                "Database cleanup disabled. Set ENABLE_DB_CLEANUP=true to enable for testing."
+            ));
+        }
+        
+        let conn = self.connection.lock().await;
+        conn.execute_batch("DELETE FROM events")?;
+        warn!("DANGER: Cleared all events from DuckDB database!");
+        Ok(())
+    }
 }
 
 /// Represents a Spark event for storage

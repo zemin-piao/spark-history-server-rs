@@ -133,6 +133,10 @@ impl HistoryProvider {
         self.store.get(app_id).await
     }
 
+    pub async fn get_executors(&self, app_id: &str) -> Result<Vec<crate::models::ExecutorSummary>> {
+        self.store.get_executor_summary(app_id).await
+    }
+
     async fn scan_event_logs_internal(&self) -> Result<()> {
         let log_dir = Path::new(&self.config.log_directory);
         if !log_dir.exists() {
@@ -244,7 +248,12 @@ impl HistoryProvider {
             let event_id = (hasher.finish() as i64).abs();
             
             if let Err(e) = self.store.store_event(event_id, &app_info.id, event).await {
-                warn!("Failed to store event in DuckDB: {}", e);
+                let error_msg = e.to_string();
+                if error_msg.contains("Duplicate key") && error_msg.contains("violates primary key constraint") {
+                    debug!("Skipping duplicate event with ID: {}", event_id);
+                } else {
+                    warn!("Failed to store event in DuckDB: {}", e);
+                }
             }
         }
 
