@@ -2,9 +2,7 @@ use anyhow::Result;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use spark_history_server::{
-    api::create_app, models::ApplicationInfo, storage::HistoryProvider,
-};
+use spark_history_server::{api::create_app, models::ApplicationInfo, storage::HistoryProvider};
 
 mod test_config;
 use test_config::create_test_config;

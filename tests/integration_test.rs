@@ -80,10 +80,7 @@ async fn test_integration_full_workflow() -> Result<()> {
         );
 
         let response = client
-            .get(format!(
-                "{}/api/v1/applications/{}",
-                base_url, first_app.id
-            ))
+            .get(format!("{}/api/v1/applications/{}", base_url, first_app.id))
             .send()
             .await?;
 
@@ -114,10 +111,7 @@ async fn test_integration_full_workflow() -> Result<()> {
     // Test 5: Non-existent application
     println!("Testing non-existent application endpoint...");
     let response = client
-        .get(format!(
-            "{}/api/v1/applications/non-existent-app",
-            base_url
-        ))
+        .get(format!("{}/api/v1/applications/non-existent-app", base_url))
         .send()
         .await?;
 

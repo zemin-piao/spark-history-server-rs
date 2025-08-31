@@ -171,9 +171,7 @@ impl EventProcessor {
     }
 
     /// HDFS scanner background task
-    async fn hdfs_scanner_task(
-        hdfs_reader: Arc<HdfsReader>
-    ) {
+    async fn hdfs_scanner_task(hdfs_reader: Arc<HdfsReader>) {
         info!("HDFS scanner task started");
 
         // Health check loop

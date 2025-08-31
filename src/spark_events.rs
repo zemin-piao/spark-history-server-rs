@@ -154,12 +154,8 @@ impl SparkEvent {
         })
     }
 
-
     /// Extract relevant fields based on event type
-    fn extract_fields(
-        event_type: &SparkEventType,
-        raw_event: &Value,
-    ) -> ExtractedFields {
+    fn extract_fields(event_type: &SparkEventType, raw_event: &Value) -> ExtractedFields {
         match event_type {
             SparkEventType::JobStart | SparkEventType::JobEnd => {
                 let job_id = raw_event.get("Job ID").and_then(|v| v.as_i64());

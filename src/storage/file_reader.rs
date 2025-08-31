@@ -79,10 +79,7 @@ impl FileReader for HdfsFileReader {
     async fn list_directory(&self, path: &Path) -> Result<Vec<String>> {
         let path_str = path.to_string_lossy();
         let entries = self.client.list_status(&path_str, false).await?;
-        Ok(entries
-            .into_iter()
-            .map(|entry| entry.path)
-            .collect())
+        Ok(entries.into_iter().map(|entry| entry.path).collect())
     }
 
     async fn file_exists(&self, path: &Path) -> bool {

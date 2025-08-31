@@ -86,11 +86,7 @@ impl EventLogParser {
         })
     }
 
-
-    fn parse_application_start(
-        &self,
-        event: &Value,
-    ) -> Result<Option<AppStartData>> {
+    fn parse_application_start(&self, event: &Value) -> Result<Option<AppStartData>> {
         let app_id = event
             .get("App ID")
             .and_then(|v| v.as_str())

@@ -158,7 +158,6 @@ impl HdfsReader {
         Ok(all_events)
     }
 
-
     /// Check if HDFS connection is healthy
     pub async fn health_check(&self) -> Result<bool> {
         // Mock health check for now
