@@ -18,17 +18,36 @@ impl DuckDbStore {
         let conn = Connection::open(db_path)?;
         
         // Install and load JSON extension first - handle potential failures gracefully
-        if let Err(e) = conn.execute_batch("INSTALL 'json'") {
-            warn!("Failed to install JSON extension (may already be installed): {}", e);
+        let install_result = conn.execute_batch("INSTALL 'json'");
+        let load_result = conn.execute_batch("LOAD 'json'");
+        
+        // Try alternative approaches if the standard method fails
+        if install_result.is_err() || load_result.is_err() {
+            warn!("Standard JSON extension loading failed, trying alternative approach");
+            
+            // Try installing from httpfs first
+            if let Err(e) = conn.execute_batch("INSTALL httpfs") {
+                debug!("HTTPFS extension install failed: {}", e);
+            }
+            if let Err(e) = conn.execute_batch("LOAD httpfs") {
+                debug!("HTTPFS extension load failed: {}", e);
+            }
+            
+            // Force reinstall JSON extension
+            if let Err(e) = conn.execute_batch("FORCE INSTALL json") {
+                debug!("Force install JSON failed: {}", e);
+            }
+            
+            // Final attempt to load JSON
+            if let Err(e) = conn.execute_batch("LOAD json") {
+                warn!("Failed to load JSON extension after all attempts: {}", e);
+                // Instead of failing, let's create a JSON-less version
+                info!("Running in JSON-less mode - some functionality may be limited");
+            }
         }
         
-        if let Err(e) = conn.execute_batch("LOAD 'json'") {
-            warn!("Failed to load JSON extension: {}", e);
-            return Err(anyhow!("JSON extension is required but could not be loaded: {}", e));
-        }
-        
-        // Create the events table with schema
-        conn.execute_batch(
+        // Create the events table with schema - use VARCHAR for JSON if JSON type fails
+        let table_creation_result = conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS events (
                 id BIGINT PRIMARY KEY,
@@ -46,7 +65,32 @@ impl DuckDbStore {
             CREATE INDEX IF NOT EXISTS idx_event_type ON events(event_type);
             CREATE INDEX IF NOT EXISTS idx_job_stage ON events(job_id, stage_id);
             "#,
-        )?;
+        );
+        
+        // If JSON type creation fails, create table with VARCHAR instead
+        if let Err(e) = table_creation_result {
+            warn!("Failed to create table with JSON type, falling back to VARCHAR: {}", e);
+            conn.execute_batch(
+                r#"
+                CREATE TABLE IF NOT EXISTS events (
+                    id BIGINT PRIMARY KEY,
+                    app_id VARCHAR NOT NULL,
+                    event_type VARCHAR NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
+                    raw_data VARCHAR,
+                    job_id BIGINT,
+                    stage_id BIGINT,
+                    task_id BIGINT,
+                    duration_ms BIGINT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_app_time ON events(app_id, timestamp);
+                CREATE INDEX IF NOT EXISTS idx_event_type ON events(event_type);
+                CREATE INDEX IF NOT EXISTS idx_job_stage ON events(job_id, stage_id);
+                "#,
+            )?;
+            info!("Created events table with VARCHAR fallback for JSON data");
+        }
 
         info!("DuckDB initialized at: {:?}", db_path);
         
