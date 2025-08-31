@@ -27,7 +27,7 @@ pub struct ApplicationAttemptInfo {
     pub spark_user: String,
     pub completed: bool,
     pub app_spark_version: String,
-    
+
     // Additional fields for API compatibility
     #[serde(rename = "startTimeEpoch")]
     pub start_time_epoch: i64,

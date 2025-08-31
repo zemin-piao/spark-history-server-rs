@@ -12,7 +12,6 @@ use spark_history_server::{
 mod test_config;
 use test_config::create_test_config;
 
-
 #[cfg(feature = "hdfs")]
 use spark_history_server::storage::file_reader::HdfsFileReader;
 
@@ -57,16 +56,26 @@ impl MockHdfsFileReader {
 {"Event":"SparkListenerApplicationEnd","App ID":"app-20231120120000-0001","Timestamp":1700481603000}
 "#;
 
-        files.insert("/hdfs/spark-events/app-20231120120000-0001/eventLog".to_string(), sample_event_log.to_string());
-        files.insert("/hdfs/spark-events/app-20231120120000-0002.inprogress".to_string(), sample_event_log.replace("app-20231120120000-0001", "app-20231120120000-0002"));
+        files.insert(
+            "/hdfs/spark-events/app-20231120120000-0001/eventLog".to_string(),
+            sample_event_log.to_string(),
+        );
+        files.insert(
+            "/hdfs/spark-events/app-20231120120000-0002.inprogress".to_string(),
+            sample_event_log.replace("app-20231120120000-0001", "app-20231120120000-0002"),
+        );
 
-        directories.insert("/hdfs/spark-events".to_string(), vec![
-            "app-20231120120000-0001".to_string(),
-            "app-20231120120000-0002.inprogress".to_string(),
-        ]);
-        directories.insert("/hdfs/spark-events/app-20231120120000-0001".to_string(), vec![
-            "eventLog".to_string(),
-        ]);
+        directories.insert(
+            "/hdfs/spark-events".to_string(),
+            vec![
+                "app-20231120120000-0001".to_string(),
+                "app-20231120120000-0002.inprogress".to_string(),
+            ],
+        );
+        directories.insert(
+            "/hdfs/spark-events/app-20231120120000-0001".to_string(),
+            vec!["eventLog".to_string()],
+        );
 
         Self { files, directories }
     }
@@ -80,18 +89,24 @@ async fn test_hdfs_file_reader_mock() -> Result<()> {
 
     let event_log_path = Path::new("/hdfs/spark-events/app-20231120120000-0001/eventLog");
     let content = hdfs_reader.read_file(event_log_path).await?;
-    
+
     assert!(content.contains("SparkPi"));
     assert!(content.contains("app-20231120120000-0001"));
     println!("✅ HDFS file reading test passed");
 
-    let entries = hdfs_reader.list_directory(Path::new("/hdfs/spark-events")).await?;
+    let entries = hdfs_reader
+        .list_directory(Path::new("/hdfs/spark-events"))
+        .await?;
     assert_eq!(entries.len(), 2);
     assert!(entries.contains(&"app-20231120120000-0001".to_string()));
     println!("✅ HDFS directory listing test passed");
 
     assert!(hdfs_reader.file_exists(event_log_path).await);
-    assert!(!hdfs_reader.file_exists(Path::new("/hdfs/non-existent")).await);
+    assert!(
+        !hdfs_reader
+            .file_exists(Path::new("/hdfs/non-existent"))
+            .await
+    );
     println!("✅ HDFS file existence check test passed");
 
     Ok(())
@@ -131,9 +146,7 @@ async fn test_hdfs_api_endpoints() -> Result<()> {
     let addr = listener.local_addr()?;
     let base_url = format!("http://{}", addr);
 
-    let server_handle = tokio::spawn(async move {
-        axum::serve(listener, app).await
-    });
+    let server_handle = tokio::spawn(async move { axum::serve(listener, app).await });
 
     sleep(Duration::from_millis(100)).await;
 
@@ -216,8 +229,8 @@ async fn test_hdfs_compression_support() -> Result<()> {
 async fn test_real_hdfs_connection() -> Result<()> {
     println!("Testing real HDFS connection (requires HDFS cluster)...");
 
-    let namenode_url = std::env::var("HDFS_NAMENODE_URL")
-        .unwrap_or_else(|_| "hdfs://localhost:9000".to_string());
+    let namenode_url =
+        std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "hdfs://localhost:9000".to_string());
 
     let hdfs_reader = HdfsFileReader::new(&namenode_url)?;
 

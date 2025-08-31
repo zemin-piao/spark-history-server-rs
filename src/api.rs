@@ -7,10 +7,7 @@ use axum::{
 };
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use serde::Deserialize;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 
 use crate::models::{ApplicationInfo, ApplicationStatus, VersionInfo};
@@ -24,16 +21,29 @@ pub async fn create_app(history_provider: HistoryProvider) -> anyhow::Result<Rou
         // API v1 routes
         .route("/api/v1/applications", get(list_applications))
         .route("/api/v1/applications/:app_id", get(get_application))
-        .route("/api/v1/applications/:app_id/jobs", get(get_application_jobs))
-        .route("/api/v1/applications/:app_id/executors", get(get_application_executors))
-        .route("/api/v1/applications/:app_id/stages", get(get_application_stages))
-        .route("/api/v1/applications/:app_id/storage/rdd", get(get_application_storage))
-        .route("/api/v1/applications/:app_id/environment", get(get_application_environment))
+        .route(
+            "/api/v1/applications/:app_id/jobs",
+            get(get_application_jobs),
+        )
+        .route(
+            "/api/v1/applications/:app_id/executors",
+            get(get_application_executors),
+        )
+        .route(
+            "/api/v1/applications/:app_id/stages",
+            get(get_application_stages),
+        )
+        .route(
+            "/api/v1/applications/:app_id/storage/rdd",
+            get(get_application_storage),
+        )
+        .route(
+            "/api/v1/applications/:app_id/environment",
+            get(get_application_environment),
+        )
         .route("/api/v1/version", get(get_version))
-        
         // Health check endpoint
         .route("/health", get(health_check))
-        
         // Add middleware
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
@@ -142,10 +152,14 @@ async fn get_application_executors(
     Path(app_id): Path<String>,
 ) -> Result<Json<Vec<crate::models::ExecutorSummary>>, StatusCode> {
     info!("GET /api/v1/applications/{}/executors", app_id);
-    
+
     match provider.get_executors(&app_id).await {
         Ok(executors) => {
-            info!("Found {} executors for application: {}", executors.len(), app_id);
+            info!(
+                "Found {} executors for application: {}",
+                executors.len(),
+                app_id
+            );
             Ok(Json(executors))
         }
         Err(e) => {
@@ -202,7 +216,9 @@ fn parse_date_param(date_str: Option<&str>) -> Option<DateTime<Utc>> {
     date_str.and_then(|s| {
         // Try parsing as Unix timestamp first
         if let Ok(timestamp) = s.parse::<i64>() {
-            return Utc.timestamp_opt(timestamp / 1000, ((timestamp % 1000) * 1_000_000) as u32).single();
+            return Utc
+                .timestamp_opt(timestamp / 1000, ((timestamp % 1000) * 1_000_000) as u32)
+                .single();
         }
 
         // Try parsing as RFC3339/ISO 8601
@@ -211,7 +227,9 @@ fn parse_date_param(date_str: Option<&str>) -> Option<DateTime<Utc>> {
         }
 
         // Try parsing as simple date format (YYYY-MM-DD)
-        if let Ok(naive_date) = NaiveDateTime::parse_from_str(&format!("{}T00:00:00", s), "%Y-%m-%dT%H:%M:%S") {
+        if let Ok(naive_date) =
+            NaiveDateTime::parse_from_str(&format!("{}T00:00:00", s), "%Y-%m-%dT%H:%M:%S")
+        {
             return Some(Utc.from_utc_datetime(&naive_date));
         }
 
@@ -222,7 +240,7 @@ fn parse_date_param(date_str: Option<&str>) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_parse_date_param() {
         // Test Unix timestamp

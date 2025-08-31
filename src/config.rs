@@ -19,22 +19,22 @@ pub struct ServerConfig {
 pub struct HistoryConfig {
     /// Path to Spark event logs directory
     pub log_directory: String,
-    
+
     /// Maximum number of applications to retain in memory
     pub max_applications: usize,
-    
+
     /// Update interval in seconds for checking new event logs
     pub update_interval_seconds: u64,
-    
+
     /// Maximum number of applications to return in a single request
     pub max_apps_per_request: usize,
-    
+
     /// Enable event log compression support
     pub compression_enabled: bool,
-    
+
     /// Directory for RocksDB cache storage
     pub cache_directory: Option<String>,
-    
+
     /// Enable persistent caching with RocksDB
     pub enable_cache: bool,
 }

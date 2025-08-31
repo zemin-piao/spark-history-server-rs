@@ -12,47 +12,47 @@ pub enum SparkEventType {
     ApplicationStart,
     #[serde(rename = "SparkListenerApplicationEnd")]
     ApplicationEnd,
-    
+
     // Job lifecycle
     #[serde(rename = "SparkListenerJobStart")]
     JobStart,
     #[serde(rename = "SparkListenerJobEnd")]
     JobEnd,
-    
+
     // Stage lifecycle
     #[serde(rename = "SparkListenerStageSubmitted")]
     StageSubmitted,
     #[serde(rename = "SparkListenerStageCompleted")]
     StageCompleted,
-    
+
     // Task lifecycle
     #[serde(rename = "SparkListenerTaskStart")]
     TaskStart,
     #[serde(rename = "SparkListenerTaskEnd")]
     TaskEnd,
-    
+
     // Executor events
     #[serde(rename = "SparkListenerExecutorAdded")]
     ExecutorAdded,
     #[serde(rename = "SparkListenerExecutorRemoved")]
     ExecutorRemoved,
-    
+
     // Block manager events
     #[serde(rename = "SparkListenerBlockManagerAdded")]
     BlockManagerAdded,
     #[serde(rename = "SparkListenerBlockManagerRemoved")]
     BlockManagerRemoved,
-    
+
     // Environment updates
     #[serde(rename = "SparkListenerEnvironmentUpdate")]
     EnvironmentUpdate,
-    
+
     // SQL events
     #[serde(rename = "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")]
     SqlExecutionStart,
     #[serde(rename = "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionEnd")]
     SqlExecutionEnd,
-    
+
     // Other/Unknown events
     Other(String),
 }
@@ -73,8 +73,12 @@ impl From<&str> for SparkEventType {
             "SparkListenerBlockManagerAdded" => Self::BlockManagerAdded,
             "SparkListenerBlockManagerRemoved" => Self::BlockManagerRemoved,
             "SparkListenerEnvironmentUpdate" => Self::EnvironmentUpdate,
-            "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart" => Self::SqlExecutionStart,
-            "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionEnd" => Self::SqlExecutionEnd,
+            "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart" => {
+                Self::SqlExecutionStart
+            }
+            "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionEnd" => {
+                Self::SqlExecutionEnd
+            }
             other => Self::Other(other.to_string()),
         }
     }
@@ -87,7 +91,7 @@ pub struct SparkEvent {
     pub timestamp: DateTime<Utc>,
     pub app_id: String,
     pub raw_data: Value,
-    
+
     // Extracted hot fields for fast queries
     pub job_id: Option<i64>,
     pub stage_id: Option<i64>,
@@ -119,7 +123,7 @@ impl SparkEvent {
             .unwrap_or_else(Utc::now);
 
         // Extract fields based on event type
-        let (job_id, stage_id, task_id, duration_ms, executor_id, host, memory_bytes, cores) = 
+        let (job_id, stage_id, task_id, duration_ms, executor_id, host, memory_bytes, cores) =
             Self::extract_fields(&event_type, raw_event);
 
         Ok(Self {
@@ -143,15 +147,21 @@ impl SparkEvent {
         event_type: &SparkEventType,
         raw_event: &Value,
     ) -> (
-        Option<i64>, Option<i64>, Option<i64>, Option<i64>, 
-        Option<String>, Option<String>, Option<i64>, Option<i32>
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+        Option<String>,
+        Option<i64>,
+        Option<i32>,
     ) {
         match event_type {
             SparkEventType::JobStart | SparkEventType::JobEnd => {
                 let job_id = raw_event.get("Job ID").and_then(|v| v.as_i64());
                 (job_id, None, None, None, None, None, None, None)
             }
-            
+
             SparkEventType::StageSubmitted | SparkEventType::StageCompleted => {
                 let stage_id = raw_event
                     .get("Stage Info")
@@ -159,53 +169,95 @@ impl SparkEvent {
                     .and_then(|v| v.as_i64());
                 (None, stage_id, None, None, None, None, None, None)
             }
-            
+
             SparkEventType::TaskStart => {
                 let task_info = raw_event.get("Task Info");
-                let task_id = task_info.and_then(|ti| ti.get("Task ID")).and_then(|v| v.as_i64());
-                let stage_id = task_info.and_then(|ti| ti.get("Stage ID")).and_then(|v| v.as_i64());
-                let executor_id = task_info.and_then(|ti| ti.get("Executor ID")).and_then(|v| v.as_str()).map(String::from);
-                let host = task_info.and_then(|ti| ti.get("Host")).and_then(|v| v.as_str()).map(String::from);
+                let task_id = task_info
+                    .and_then(|ti| ti.get("Task ID"))
+                    .and_then(|v| v.as_i64());
+                let stage_id = task_info
+                    .and_then(|ti| ti.get("Stage ID"))
+                    .and_then(|v| v.as_i64());
+                let executor_id = task_info
+                    .and_then(|ti| ti.get("Executor ID"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let host = task_info
+                    .and_then(|ti| ti.get("Host"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
                 (None, stage_id, task_id, None, executor_id, host, None, None)
             }
-            
+
             SparkEventType::TaskEnd => {
                 let task_info = raw_event.get("Task Info");
                 let task_metrics = raw_event.get("Task Metrics");
-                
-                let task_id = task_info.and_then(|ti| ti.get("Task ID")).and_then(|v| v.as_i64());
-                let stage_id = task_info.and_then(|ti| ti.get("Stage ID")).and_then(|v| v.as_i64());
-                let executor_id = task_info.and_then(|ti| ti.get("Executor ID")).and_then(|v| v.as_str()).map(String::from);
-                let host = task_info.and_then(|ti| ti.get("Host")).and_then(|v| v.as_str()).map(String::from);
-                
+
+                let task_id = task_info
+                    .and_then(|ti| ti.get("Task ID"))
+                    .and_then(|v| v.as_i64());
+                let stage_id = task_info
+                    .and_then(|ti| ti.get("Stage ID"))
+                    .and_then(|v| v.as_i64());
+                let executor_id = task_info
+                    .and_then(|ti| ti.get("Executor ID"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let host = task_info
+                    .and_then(|ti| ti.get("Host"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+
                 let duration_ms = task_metrics
                     .and_then(|tm| tm.get("Executor Run Time"))
                     .and_then(|v| v.as_i64());
-                
-                (None, stage_id, task_id, duration_ms, executor_id, host, None, None)
+
+                (
+                    None,
+                    stage_id,
+                    task_id,
+                    duration_ms,
+                    executor_id,
+                    host,
+                    None,
+                    None,
+                )
             }
-            
+
             SparkEventType::ExecutorAdded => {
                 let executor_info = raw_event.get("Executor Info");
-                let executor_id = raw_event.get("Executor ID").and_then(|v| v.as_str()).map(String::from);
-                let host = executor_info.and_then(|ei| ei.get("Host")).and_then(|v| v.as_str()).map(String::from);
-                let cores = executor_info.and_then(|ei| ei.get("Total Cores")).and_then(|v| v.as_i64()).map(|v| v as i32);
+                let executor_id = raw_event
+                    .get("Executor ID")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let host = executor_info
+                    .and_then(|ei| ei.get("Host"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let cores = executor_info
+                    .and_then(|ei| ei.get("Total Cores"))
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32);
                 (None, None, None, None, executor_id, host, None, cores)
             }
-            
+
             SparkEventType::ExecutorRemoved => {
-                let executor_id = raw_event.get("Executor ID").and_then(|v| v.as_str()).map(String::from);
+                let executor_id = raw_event
+                    .get("Executor ID")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
                 (None, None, None, None, executor_id, None, None, None)
             }
-            
+
             _ => (None, None, None, None, None, None, None, None),
         }
     }
 
     /// Get unique identifier for database
     pub fn get_id(&self) -> String {
-        format!("{}_{}_{}_{}", 
-            self.app_id, 
+        format!(
+            "{}_{}_{}_{}",
+            self.app_id,
             self.timestamp.timestamp_millis(),
             self.event_type_str(),
             self.task_id.unwrap_or(0)

@@ -1,9 +1,9 @@
-use tokio;
 use spark_history_server::{
+    api::create_app,
     config::{HistoryConfig, ServerConfig, Settings},
     storage::HistoryProvider,
-    api::create_app,
 };
+use tokio;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,7 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     println!("Starting Spark History Server example...");
-    println!("Server will start on http://{}:{}", settings.server.host, settings.server.port);
+    println!(
+        "Server will start on http://{}:{}",
+        settings.server.host, settings.server.port
+    );
     println!("API endpoints:");
     println!("  GET /api/v1/applications");
     println!("  GET /api/v1/applications/{{app_id}}");
@@ -45,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start the server
     let addr = format!("{}:{}", settings.server.host, settings.server.port);
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    
+
     println!("Server listening on http://{}", listener.local_addr()?);
     axum::serve(listener, app).await?;
 

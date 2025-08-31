@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use duckdb::{Connection, params};
+use duckdb::{params, Connection};
 use serde_json::Value;
 use std::path::Path;
 use tokio::sync::Mutex;
@@ -16,15 +16,15 @@ impl DuckDbStore {
     /// Create a new DuckDB store with the database file
     pub async fn new(db_path: &Path) -> Result<Self> {
         let conn = Connection::open(db_path)?;
-        
+
         // Install and load JSON extension first - handle potential failures gracefully
         let install_result = conn.execute_batch("INSTALL 'json'");
         let load_result = conn.execute_batch("LOAD 'json'");
-        
+
         // Try alternative approaches if the standard method fails
         if install_result.is_err() || load_result.is_err() {
             warn!("Standard JSON extension loading failed, trying alternative approach");
-            
+
             // Try installing from httpfs first
             if let Err(e) = conn.execute_batch("INSTALL httpfs") {
                 debug!("HTTPFS extension install failed: {}", e);
@@ -32,12 +32,12 @@ impl DuckDbStore {
             if let Err(e) = conn.execute_batch("LOAD httpfs") {
                 debug!("HTTPFS extension load failed: {}", e);
             }
-            
+
             // Force reinstall JSON extension
             if let Err(e) = conn.execute_batch("FORCE INSTALL json") {
                 debug!("Force install JSON failed: {}", e);
             }
-            
+
             // Final attempt to load JSON
             if let Err(e) = conn.execute_batch("LOAD json") {
                 warn!("Failed to load JSON extension after all attempts: {}", e);
@@ -45,7 +45,7 @@ impl DuckDbStore {
                 info!("Running in JSON-less mode - some functionality may be limited");
             }
         }
-        
+
         // Create the events table with schema - use VARCHAR for JSON if JSON type fails
         let table_creation_result = conn.execute_batch(
             r#"
@@ -66,10 +66,13 @@ impl DuckDbStore {
             CREATE INDEX IF NOT EXISTS idx_job_stage ON events(job_id, stage_id);
             "#,
         );
-        
+
         // If JSON type creation fails, create table with VARCHAR instead
         if let Err(e) = table_creation_result {
-            warn!("Failed to create table with JSON type, falling back to VARCHAR: {}", e);
+            warn!(
+                "Failed to create table with JSON type, falling back to VARCHAR: {}",
+                e
+            );
             conn.execute_batch(
                 r#"
                 CREATE TABLE IF NOT EXISTS events (
@@ -93,7 +96,7 @@ impl DuckDbStore {
         }
 
         info!("DuckDB initialized at: {:?}", db_path);
-        
+
         Ok(Self {
             connection: Mutex::new(conn),
         })
@@ -118,7 +121,7 @@ impl DuckDbStore {
         // Use transaction for batch insert
         let transaction_result = (|| -> Result<()> {
             conn.execute_batch("BEGIN TRANSACTION")?;
-            
+
             for event in &events {
                 stmt.execute(params![
                     event.id,
@@ -127,16 +130,16 @@ impl DuckDbStore {
                     &event.timestamp,
                     &event.raw_data.to_string(),
                     event.job_id,
-                    event.stage_id, 
+                    event.stage_id,
                     event.task_id,
                     event.duration_ms,
                 ])?;
             }
-            
+
             conn.execute_batch("COMMIT")?;
             Ok(())
         })();
-        
+
         if let Err(e) = transaction_result {
             // Rollback on any error
             if let Err(rollback_err) = conn.execute_batch("ROLLBACK") {
@@ -144,7 +147,7 @@ impl DuckDbStore {
             }
             return Err(e);
         }
-        
+
         debug!("Inserted {} events into DuckDB", events.len());
         Ok(())
     }
@@ -157,7 +160,7 @@ impl DuckDbStore {
         max_date: Option<&str>,
     ) -> Result<Vec<ApplicationInfo>> {
         let conn = self.connection.lock().await;
-        
+
         let mut query = String::from(
             r#"
             SELECT 
@@ -171,25 +174,28 @@ impl DuckDbStore {
         );
 
         let mut param_values = Vec::new();
-        
+
         if let Some(min) = min_date {
             query.push_str(" AND timestamp >= ?");
             param_values.push(min.to_string());
         }
-        
+
         if let Some(max) = max_date {
             query.push_str(" AND timestamp <= ?");
             param_values.push(max.to_string());
         }
-        
+
         query.push_str(" GROUP BY app_id ORDER BY end_time DESC");
-        
+
         if let Some(limit) = limit {
             query.push_str(&format!(" LIMIT {}", limit));
         }
 
         let mut stmt = conn.prepare(&query)?;
-        let param_refs: Vec<&dyn duckdb::ToSql> = param_values.iter().map(|p| p as &dyn duckdb::ToSql).collect();
+        let param_refs: Vec<&dyn duckdb::ToSql> = param_values
+            .iter()
+            .map(|p| p as &dyn duckdb::ToSql)
+            .collect();
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             Ok(ApplicationInfo {
                 id: row.get(0)?,
@@ -213,11 +219,10 @@ impl DuckDbStore {
     /// Get events for a specific application
     pub async fn get_app_events(&self, app_id: &str) -> Result<Vec<Value>> {
         let conn = self.connection.lock().await;
-        
-        let mut stmt = conn.prepare(
-            "SELECT raw_data FROM events WHERE app_id = ? ORDER BY timestamp"
-        )?;
-        
+
+        let mut stmt =
+            conn.prepare("SELECT raw_data FROM events WHERE app_id = ? ORDER BY timestamp")?;
+
         let rows = stmt.query_map([app_id], |row| {
             let json_str: String = row.get(0)?;
             match serde_json::from_str::<Value>(&json_str) {
@@ -240,7 +245,7 @@ impl DuckDbStore {
     /// Cross-application analytics query example
     pub async fn get_resource_usage_summary(&self) -> Result<Vec<ResourceUsage>> {
         let conn = self.connection.lock().await;
-        
+
         let mut stmt = conn.prepare(
             r#"
             SELECT 
@@ -308,9 +313,12 @@ impl DuckDbStore {
     }
 
     /// Get executor summary for a specific application
-    pub async fn get_executor_summary(&self, app_id: &str) -> Result<Vec<crate::models::ExecutorSummary>> {
+    pub async fn get_executor_summary(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<crate::models::ExecutorSummary>> {
         let conn = self.connection.lock().await;
-        
+
         let query = r#"
             WITH executor_events AS (
                 SELECT 
@@ -444,7 +452,7 @@ impl DuckDbStore {
                 "Database cleanup disabled. Set ENABLE_DB_CLEANUP=true to enable for testing."
             ));
         }
-        
+
         let conn = self.connection.lock().await;
         conn.execute_batch("DELETE FROM events")?;
         warn!("DANGER: Cleared all events from DuckDB database!");
@@ -488,7 +496,7 @@ impl SparkEvent {
             .get("Timestamp")
             .and_then(|v| v.as_i64())
             .map(|ts| {
-                use chrono::{DateTime, Utc, TimeZone};
+                use chrono::{DateTime, TimeZone, Utc};
                 Utc.timestamp_millis_opt(ts)
                     .single()
                     .map(|dt| dt.to_rfc3339())
@@ -499,18 +507,17 @@ impl SparkEvent {
         // Extract hot fields based on event type
         let job_id = raw_event.get("Job ID").and_then(|v| v.as_i64());
         let stage_id = raw_event.get("Stage ID").and_then(|v| v.as_i64());
-        let task_id = raw_event.get("Task Info")
+        let task_id = raw_event
+            .get("Task Info")
             .and_then(|ti| ti.get("Task ID"))
             .and_then(|v| v.as_i64());
-        
+
         // Duration from task metrics
         let duration_ms = match event_type {
-            "SparkListenerTaskEnd" => {
-                raw_event
-                    .get("Task Metrics")
-                    .and_then(|tm| tm.get("Executor Run Time"))
-                    .and_then(|v| v.as_i64())
-            }
+            "SparkListenerTaskEnd" => raw_event
+                .get("Task Metrics")
+                .and_then(|tm| tm.get("Executor Run Time"))
+                .and_then(|v| v.as_i64()),
             _ => None,
         };
 

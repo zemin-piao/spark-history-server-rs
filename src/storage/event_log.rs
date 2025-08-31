@@ -55,12 +55,12 @@ impl EventLogParser {
             }
         }
 
-        let app_info = app_info.ok_or_else(|| anyhow!("No SparkListenerApplicationStart event found"))?;
-        
+        let app_info =
+            app_info.ok_or_else(|| anyhow!("No SparkListenerApplicationStart event found"))?;
+
         let start_time = start_time.unwrap_or_else(Utc::now);
-        let end_time = end_time.unwrap_or_else(|| {
-            if completed { last_updated } else { Utc::now() }
-        });
+        let end_time =
+            end_time.unwrap_or_else(|| if completed { last_updated } else { Utc::now() });
 
         let attempt = ApplicationAttemptInfo::new(
             app_info.3.clone(), // attempt_id
@@ -83,7 +83,10 @@ impl EventLogParser {
         })
     }
 
-    fn parse_application_start(&self, event: &Value) -> Result<Option<(String, String, String, Option<String>, String)>> {
+    fn parse_application_start(
+        &self,
+        event: &Value,
+    ) -> Result<Option<(String, String, String, Option<String>, String)>> {
         let app_id = event
             .get("App ID")
             .and_then(|v| v.as_str())
@@ -122,7 +125,8 @@ impl EventLogParser {
     }
 
     fn extract_timestamp(&self, event: &Value, field: &str) -> Option<DateTime<Utc>> {
-        event.get(field)
+        event
+            .get(field)
             .and_then(|v| v.as_i64())
             .and_then(|ts| Utc.timestamp_millis_opt(ts).single())
     }

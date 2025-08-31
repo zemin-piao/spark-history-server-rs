@@ -30,13 +30,13 @@ impl FileReader for LocalFileReader {
     async fn list_directory(&self, path: &Path) -> Result<Vec<String>> {
         let mut entries = Vec::new();
         let mut dir_entries = fs::read_dir(path).await?;
-        
+
         while let Some(entry) = dir_entries.next_entry().await? {
             if let Some(name) = entry.file_name().to_str() {
                 entries.push(name.to_string());
             }
         }
-        
+
         Ok(entries)
     }
 
@@ -73,7 +73,8 @@ impl FileReader for HdfsFileReader {
     async fn list_directory(&self, path: &Path) -> Result<Vec<String>> {
         let path_str = path.to_string_lossy();
         let entries = self.client.list_status(&path_str, false).await?;
-        Ok(entries.into_iter()
+        Ok(entries
+            .into_iter()
             .map(|entry| entry.name().to_string())
             .collect())
     }

@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::time::{interval, Duration, sleep};
-use tracing::{debug, info, warn, error};
+use tokio::time::{interval, sleep, Duration};
+use tracing::{debug, error, info, warn};
 
-use crate::hdfs_reader::{HdfsReader, HdfsConfig};
-use crate::storage::duckdb_store::{DuckDbStore, SparkEvent as DbSparkEvent};
+use crate::hdfs_reader::{HdfsConfig, HdfsReader};
 use crate::spark_events::SparkEvent;
+use crate::storage::duckdb_store::{DuckDbStore, SparkEvent as DbSparkEvent};
 
 /// Event processor that coordinates HDFS reading and DuckDB storage
 pub struct EventProcessor {
@@ -27,9 +27,8 @@ impl EventProcessor {
         batch_size: usize,
         flush_interval_secs: u64,
     ) -> Result<Self> {
-        let hdfs_reader = Arc::new(
-            HdfsReader::new(&hdfs_config.namenode_uri, &hdfs_config.base_path).await?
-        );
+        let hdfs_reader =
+            Arc::new(HdfsReader::new(&hdfs_config.namenode_uri, &hdfs_config.base_path).await?);
 
         let duckdb_store = Arc::new(DuckDbStore::new(duckdb_path).await?);
 
@@ -44,17 +43,19 @@ impl EventProcessor {
 
     /// Start the event processing pipeline
     pub async fn start(&mut self) -> Result<()> {
-        info!("Starting event processor with batch_size={}, flush_interval={}s", 
-            self.batch_size, self.flush_interval_secs);
+        info!(
+            "Starting event processor with batch_size={}, flush_interval={}s",
+            self.batch_size, self.flush_interval_secs
+        );
 
         // Create channels for batching
         let (event_tx, event_rx) = mpsc::unbounded_channel::<SparkEvent>();
-        
+
         // Start batch writer task
         let store_clone = Arc::clone(&self.duckdb_store);
         let batch_size = self.batch_size;
         let flush_interval = self.flush_interval_secs;
-        
+
         tokio::spawn(async move {
             Self::batch_writer_task(store_clone, event_rx, batch_size, flush_interval).await;
         });
@@ -62,7 +63,7 @@ impl EventProcessor {
         // Start HDFS scanning task
         let hdfs_clone = Arc::clone(&self.hdfs_reader);
         let tx_clone = event_tx.clone();
-        
+
         tokio::spawn(async move {
             Self::hdfs_scanner_task(hdfs_clone, tx_clone).await;
         });
@@ -82,7 +83,7 @@ impl EventProcessor {
         let start_time = std::time::Instant::now();
         let applications = self.hdfs_reader.list_applications().await?;
         let app_count = applications.len();
-        
+
         info!("Full scan starting for {} applications", app_count);
         let mut total_events = 0;
 
@@ -90,7 +91,7 @@ impl EventProcessor {
             match self.hdfs_reader.read_application_events(&app_id).await {
                 Ok(events) => {
                     total_events += events.len();
-                    
+
                     // Send events to batch writer
                     for event in events {
                         if let Err(e) = event_tx.send(event) {
@@ -99,7 +100,8 @@ impl EventProcessor {
                     }
 
                     // Update last scan timestamp for this app
-                    self.last_scan_timestamps.insert(app_id.clone(), chrono::Utc::now().timestamp_millis());
+                    self.last_scan_timestamps
+                        .insert(app_id.clone(), chrono::Utc::now().timestamp_millis());
                 }
                 Err(e) => {
                     warn!("Failed to scan application {}: {}", app_id, e);
@@ -108,8 +110,10 @@ impl EventProcessor {
         }
 
         let duration = start_time.elapsed();
-        info!("Full scan completed: {} events from {} applications in {:?}", 
-            total_events, app_count, duration);
+        info!(
+            "Full scan completed: {} events from {} applications in {:?}",
+            total_events, app_count, duration
+        );
 
         Ok(())
     }
@@ -121,22 +125,21 @@ impl EventProcessor {
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(scan_interval_secs));
-            
+
             loop {
                 interval.tick().await;
-                
+
                 debug!("Starting incremental scan");
-                
+
                 match hdfs_reader.list_applications().await {
                     Ok(app_ids) => {
                         for app_id in app_ids {
                             // For now, do simple periodic full scan of each app
                             // TODO: Implement proper incremental scanning based on file modification times
-                            if let Err(e) = Self::scan_application_incremental(
-                                &hdfs_reader, 
-                                &app_id, 
-                                &event_tx
-                            ).await {
+                            if let Err(e) =
+                                Self::scan_application_incremental(&hdfs_reader, &app_id, &event_tx)
+                                    .await
+                            {
                                 warn!("Incremental scan failed for {}: {}", app_id, e);
                             }
                         }
@@ -153,12 +156,12 @@ impl EventProcessor {
         app_id: &str,
         _event_tx: &mpsc::UnboundedSender<SparkEvent>,
     ) -> Result<()> {
-        // Simple implementation: get all events (in real implementation, 
+        // Simple implementation: get all events (in real implementation,
         // we'd track file modification times and only read changed files)
         let events = hdfs_reader.read_application_events(app_id).await?;
-        
+
         debug!("Incremental scan for {}: {} events", app_id, events.len());
-        
+
         for event in events {
             if let Err(e) = _event_tx.send(event) {
                 error!("Failed to send incremental event: {}", e);
@@ -174,13 +177,13 @@ impl EventProcessor {
         event_tx: mpsc::UnboundedSender<SparkEvent>,
     ) {
         info!("HDFS scanner task started");
-        
+
         // Health check loop
         let mut health_check_interval = interval(Duration::from_secs(300)); // 5 minutes
-        
+
         loop {
             health_check_interval.tick().await;
-            
+
             if let Err(e) = hdfs_reader.health_check().await {
                 error!("HDFS health check failed: {}", e);
                 // Could implement reconnection logic here
@@ -197,7 +200,7 @@ impl EventProcessor {
         flush_interval_secs: u64,
     ) {
         info!("Batch writer task started");
-        
+
         let mut batch: Vec<DbSparkEvent> = Vec::with_capacity(batch_size);
         let mut flush_timer = interval(Duration::from_secs(flush_interval_secs));
         let mut event_id_counter: i64 = 0;
@@ -209,7 +212,7 @@ impl EventProcessor {
                     match event_opt {
                         Some(event) => {
                             event_id_counter += 1;
-                            
+
                             // Convert SparkEvent to DbSparkEvent
                             let db_event = DbSparkEvent {
                                 id: event_id_counter,
@@ -222,9 +225,9 @@ impl EventProcessor {
                                 task_id: event.task_id,
                                 duration_ms: event.duration_ms,
                             };
-                            
+
                             batch.push(db_event);
-                            
+
                             // Flush if batch is full
                             if batch.len() >= batch_size {
                                 Self::flush_batch(&duckdb_store, &mut batch).await;
@@ -239,7 +242,7 @@ impl EventProcessor {
                         }
                     }
                 }
-                
+
                 // Periodic flush timer
                 _ = flush_timer.tick() => {
                     if !batch.is_empty() {
@@ -252,10 +255,7 @@ impl EventProcessor {
     }
 
     /// Flush a batch of events to DuckDB
-    async fn flush_batch(
-        duckdb_store: &Arc<DuckDbStore>,
-        batch: &mut Vec<DbSparkEvent>,
-    ) {
+    async fn flush_batch(duckdb_store: &Arc<DuckDbStore>, batch: &mut Vec<DbSparkEvent>) {
         if batch.is_empty() {
             return;
         }

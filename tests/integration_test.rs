@@ -12,7 +12,6 @@ use spark_history_server::{
 mod test_config;
 use test_config::create_test_config;
 
-
 #[tokio::test]
 async fn test_integration_full_workflow() -> Result<()> {
     // Setup test configuration
@@ -30,9 +29,7 @@ async fn test_integration_full_workflow() -> Result<()> {
     let base_url = format!("http://{}", addr);
 
     // Spawn server in background
-    let server_handle = tokio::spawn(async move {
-        axum::serve(listener, app).await
-    });
+    let server_handle = tokio::spawn(async move { axum::serve(listener, app).await });
 
     // Give server time to start
     sleep(Duration::from_millis(100)).await;
@@ -42,11 +39,8 @@ async fn test_integration_full_workflow() -> Result<()> {
 
     // Test 1: Health check
     println!("Testing health check endpoint...");
-    let response = client
-        .get(&format!("{}/health", base_url))
-        .send()
-        .await?;
-    
+    let response = client.get(&format!("{}/health", base_url)).send().await?;
+
     assert_eq!(response.status(), 200);
     let health: Value = response.json().await?;
     assert_eq!(health["status"], "healthy");
@@ -58,7 +52,7 @@ async fn test_integration_full_workflow() -> Result<()> {
         .get(&format!("{}/api/v1/version", base_url))
         .send()
         .await?;
-    
+
     assert_eq!(response.status(), 200);
     let version: VersionInfo = response.json().await?;
     assert!(!version.version.is_empty());
@@ -70,21 +64,30 @@ async fn test_integration_full_workflow() -> Result<()> {
         .get(&format!("{}/api/v1/applications", base_url))
         .send()
         .await?;
-    
+
     assert_eq!(response.status(), 200);
     let apps: Vec<ApplicationInfo> = response.json().await?;
-    println!("✅ Applications endpoint passed, found {} applications", apps.len());
+    println!(
+        "✅ Applications endpoint passed, found {} applications",
+        apps.len()
+    );
 
     // If we have applications, test individual app endpoint
     if !apps.is_empty() {
         let first_app = &apps[0];
-        println!("Testing individual application endpoint for app: {}", first_app.id);
-        
+        println!(
+            "Testing individual application endpoint for app: {}",
+            first_app.id
+        );
+
         let response = client
-            .get(&format!("{}/api/v1/applications/{}", base_url, first_app.id))
+            .get(&format!(
+                "{}/api/v1/applications/{}",
+                base_url, first_app.id
+            ))
             .send()
             .await?;
-        
+
         assert_eq!(response.status(), 200);
         let app: ApplicationInfo = response.json().await?;
         assert_eq!(app.id, first_app.id);
@@ -94,22 +97,31 @@ async fn test_integration_full_workflow() -> Result<()> {
     // Test 4: Applications with query parameters
     println!("Testing applications endpoint with query parameters...");
     let response = client
-        .get(&format!("{}/api/v1/applications?limit=5&status=COMPLETED", base_url))
+        .get(&format!(
+            "{}/api/v1/applications?limit=5&status=COMPLETED",
+            base_url
+        ))
         .send()
         .await?;
-    
+
     assert_eq!(response.status(), 200);
     let filtered_apps: Vec<ApplicationInfo> = response.json().await?;
     assert!(filtered_apps.len() <= 5);
-    println!("✅ Applications with filters passed, returned {} applications", filtered_apps.len());
+    println!(
+        "✅ Applications with filters passed, returned {} applications",
+        filtered_apps.len()
+    );
 
     // Test 5: Non-existent application
     println!("Testing non-existent application endpoint...");
     let response = client
-        .get(&format!("{}/api/v1/applications/non-existent-app", base_url))
+        .get(&format!(
+            "{}/api/v1/applications/non-existent-app",
+            base_url
+        ))
         .send()
         .await?;
-    
+
     assert_eq!(response.status(), 404);
     println!("✅ Non-existent application returns 404 as expected");
 
@@ -117,12 +129,15 @@ async fn test_integration_full_workflow() -> Result<()> {
     if !apps.is_empty() {
         let first_app = &apps[0];
         println!("Testing jobs endpoint for app: {}", first_app.id);
-        
+
         let response = client
-            .get(&format!("{}/api/v1/applications/{}/jobs", base_url, first_app.id))
+            .get(&format!(
+                "{}/api/v1/applications/{}/jobs",
+                base_url, first_app.id
+            ))
             .send()
             .await?;
-        
+
         assert_eq!(response.status(), 200);
         let jobs: Vec<Value> = response.json().await?;
         println!("✅ Jobs endpoint passed, returned {} jobs", jobs.len());
@@ -146,9 +161,7 @@ async fn test_date_filtering() -> Result<()> {
     let addr = listener.local_addr()?;
     let base_url = format!("http://{}", addr);
 
-    let server_handle = tokio::spawn(async move {
-        axum::serve(listener, app).await
-    });
+    let server_handle = tokio::spawn(async move { axum::serve(listener, app).await });
 
     sleep(Duration::from_millis(100)).await;
 
@@ -166,7 +179,10 @@ async fn test_date_filtering() -> Result<()> {
 
     assert_eq!(response.status(), 200);
     let apps: Vec<ApplicationInfo> = response.json().await?;
-    println!("✅ Date filtering passed, returned {} applications", apps.len());
+    println!(
+        "✅ Date filtering passed, returned {} applications",
+        apps.len()
+    );
 
     server_handle.abort();
     Ok(())
@@ -183,9 +199,7 @@ async fn test_cors_headers() -> Result<()> {
     let addr = listener.local_addr()?;
     let base_url = format!("http://{}", addr);
 
-    let server_handle = tokio::spawn(async move {
-        axum::serve(listener, app).await
-    });
+    let server_handle = tokio::spawn(async move { axum::serve(listener, app).await });
 
     sleep(Duration::from_millis(100)).await;
 
@@ -194,7 +208,10 @@ async fn test_cors_headers() -> Result<()> {
     // Test CORS preflight request
     println!("Testing CORS headers...");
     let response = client
-        .request(reqwest::Method::OPTIONS, &format!("{}/api/v1/applications", base_url))
+        .request(
+            reqwest::Method::OPTIONS,
+            &format!("{}/api/v1/applications", base_url),
+        )
         .header("Origin", "http://localhost:3000")
         .header("Access-Control-Request-Method", "GET")
         .send()

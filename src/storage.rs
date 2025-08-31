@@ -1,15 +1,8 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use std::{
-    fs,
-    path::Path,
-    sync::Arc,
-    time::SystemTime,
-};
-use tokio::{
-    time::{interval, Duration},
-};
+use std::{fs, path::Path, sync::Arc, time::SystemTime};
+use tokio::time::{interval, Duration};
 use tracing::{debug, error, info, warn};
 
 use crate::config::HistoryConfig;
@@ -96,12 +89,16 @@ impl HistoryProvider {
         }
 
         // Date filters
-        if min_date.is_some() || max_date.is_some() || min_end_date.is_some() || max_end_date.is_some() {
+        if min_date.is_some()
+            || max_date.is_some()
+            || min_end_date.is_some()
+            || max_end_date.is_some()
+        {
             results.retain(|app| {
                 app.attempts.iter().any(|attempt| {
                     let start_ok = min_date.map_or(true, |min| attempt.start_time >= min)
                         && max_date.map_or(true, |max| attempt.start_time <= max);
-                    
+
                     let end_ok = if attempt.completed {
                         min_end_date.map_or(true, |min| attempt.end_time >= min)
                             && max_end_date.map_or(true, |max| attempt.end_time <= max)
@@ -116,8 +113,18 @@ impl HistoryProvider {
 
         // Sort by end time (newest first)
         results.sort_by(|a, b| {
-            let a_time = a.attempts.iter().map(|att| att.end_time).max().unwrap_or_default();
-            let b_time = b.attempts.iter().map(|att| att.end_time).max().unwrap_or_default();
+            let a_time = a
+                .attempts
+                .iter()
+                .map(|att| att.end_time)
+                .max()
+                .unwrap_or_default();
+            let b_time = b
+                .attempts
+                .iter()
+                .map(|att| att.end_time)
+                .max()
+                .unwrap_or_default();
             b_time.cmp(&a_time)
         });
 
@@ -140,7 +147,10 @@ impl HistoryProvider {
     async fn scan_event_logs_internal(&self) -> Result<()> {
         let log_dir = Path::new(&self.config.log_directory);
         if !log_dir.exists() {
-            return Err(anyhow!("Log directory does not exist: {}", self.config.log_directory));
+            return Err(anyhow!(
+                "Log directory does not exist: {}",
+                self.config.log_directory
+            ));
         }
 
         info!("Scanning event logs in: {}", self.config.log_directory);
@@ -149,15 +159,16 @@ impl HistoryProvider {
         for entry in fs::read_dir(log_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_dir() {
                 // Single application directory
                 if let Ok(app_info) = self.parse_application_directory(&path).await {
                     self.store.put(&app_info.id.clone(), app_info).await?;
                     app_count += 1;
                 }
-            } else if path.extension().and_then(|s| s.to_str()) == Some("inprogress") 
-                || path.to_string_lossy().contains("eventLog") {
+            } else if path.extension().and_then(|s| s.to_str()) == Some("inprogress")
+                || path.to_string_lossy().contains("eventLog")
+            {
                 // Single event log file
                 if let Ok(app_info) = self.parse_event_log_file(&path).await {
                     self.store.put(&app_info.id.clone(), app_info).await?;
@@ -183,14 +194,20 @@ impl HistoryProvider {
             let path = entry.path();
             if path.is_file() {
                 let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-                if filename.starts_with("events_") || filename == "eventLog" || filename.contains("eventLog") {
+                if filename.starts_with("events_")
+                    || filename == "eventLog"
+                    || filename.contains("eventLog")
+                {
                     event_files.push(path);
                 }
             }
         }
 
         if event_files.is_empty() {
-            return Err(anyhow!("No event log files found in directory: {:?}", app_dir));
+            return Err(anyhow!(
+                "No event log files found in directory: {:?}",
+                app_dir
+            ));
         }
 
         // Parse the main event log file (usually the largest or most recent)
@@ -199,16 +216,16 @@ impl HistoryProvider {
                 .and_then(|m| m.modified())
                 .unwrap_or(SystemTime::UNIX_EPOCH)
         });
-        
+
         let main_event_file = event_files.last().unwrap();
         self.parse_event_log_file(main_event_file).await
     }
 
     async fn parse_event_log_file(&self, file_path: &Path) -> Result<ApplicationInfo> {
         debug!("Parsing event log file: {:?}", file_path);
-        
+
         let content = self.file_reader.read_file(file_path).await?;
-        
+
         // Determine if file is compressed
         let decompressed = if self.config.compression_enabled {
             self.decompress_if_needed(&content, file_path)?
@@ -222,10 +239,12 @@ impl HistoryProvider {
                 if line.trim().is_empty() {
                     None
                 } else {
-                    serde_json::from_str(line).map_err(|e| {
-                        warn!("Failed to parse event line: {}", e);
-                        e
-                    }).ok()
+                    serde_json::from_str(line)
+                        .map_err(|e| {
+                            warn!("Failed to parse event line: {}", e);
+                            e
+                        })
+                        .ok()
                 }
             })
             .collect();
@@ -233,12 +252,14 @@ impl HistoryProvider {
         debug!("Processed {} events from {:?}", events.len(), file_path);
 
         // Parse application info from events first
-        let app_info = self.event_parser.parse_application_from_events(events.clone(), file_path)?;
+        let app_info = self
+            .event_parser
+            .parse_application_from_events(events.clone(), file_path)?;
 
         // Store individual events in DuckDB for analytics with unique IDs
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         for (i, event) in events.iter().enumerate() {
             // Generate a unique ID using hash of app_id + file_path + index
             let mut hasher = DefaultHasher::new();
@@ -246,10 +267,12 @@ impl HistoryProvider {
             file_path.hash(&mut hasher);
             i.hash(&mut hasher);
             let event_id = (hasher.finish() as i64).abs();
-            
+
             if let Err(e) = self.store.store_event(event_id, &app_info.id, event).await {
                 let error_msg = e.to_string();
-                if error_msg.contains("Duplicate key") && error_msg.contains("violates primary key constraint") {
+                if error_msg.contains("Duplicate key")
+                    && error_msg.contains("violates primary key constraint")
+                {
                     debug!("Skipping duplicate event with ID: {}", event_id);
                 } else {
                     warn!("Failed to store event in DuckDB: {}", e);
@@ -266,7 +289,7 @@ impl HistoryProvider {
                 "gz" => {
                     use flate2::read::GzDecoder;
                     use std::io::Read;
-                    
+
                     let mut decoder = GzDecoder::new(content.as_bytes());
                     let mut decompressed = String::new();
                     decoder.read_to_string(&mut decompressed)?;
@@ -286,7 +309,7 @@ impl HistoryProvider {
 
     async fn start_background_refresh(&self) {
         let mut interval = interval(Duration::from_secs(self.config.update_interval_seconds));
-        
+
         loop {
             interval.tick().await;
             if let Err(e) = self.scan_event_logs_internal().await {
