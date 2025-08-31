@@ -12,7 +12,6 @@ use spark_history_server::{
 mod test_config;
 use test_config::create_test_config;
 
-#[cfg(feature = "hdfs")]
 use spark_history_server::storage::file_reader::HdfsFileReader;
 
 struct MockHdfsFileReader {
@@ -116,7 +115,7 @@ async fn test_hdfs_file_reader_mock() -> Result<()> {
 async fn test_hdfs_integration_with_history_provider() -> Result<()> {
     println!("Testing HDFS integration with HistoryProvider...");
 
-    let config = HistoryConfig {
+    let _config = HistoryConfig {
         log_directory: "/hdfs/spark-events".to_string(),
         max_applications: 100,
         update_interval_seconds: 60,
@@ -154,7 +153,7 @@ async fn test_hdfs_api_endpoints() -> Result<()> {
 
     println!("Testing applications endpoint with HDFS backend...");
     let response = client
-        .get(&format!("{}/api/v1/applications", base_url))
+        .get(format!("{}/api/v1/applications", base_url))
         .send()
         .await?;
 
@@ -168,7 +167,7 @@ async fn test_hdfs_api_endpoints() -> Result<()> {
 
         println!("Testing individual application endpoint...");
         let response = client
-            .get(&format!("{}/api/v1/applications/{}", base_url, test_app.id))
+            .get(format!("{}/api/v1/applications/{}", base_url, test_app.id))
             .send()
             .await?;
 
@@ -223,7 +222,6 @@ async fn test_hdfs_compression_support() -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "hdfs")]
 #[tokio::test]
 #[ignore]
 async fn test_real_hdfs_connection() -> Result<()> {

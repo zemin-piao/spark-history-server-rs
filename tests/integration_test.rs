@@ -5,7 +5,6 @@ use tokio::time::sleep;
 
 use spark_history_server::{
     api::create_app,
-    config::{HistoryConfig, Settings},
     models::{ApplicationInfo, VersionInfo},
     storage::HistoryProvider,
 };
@@ -39,7 +38,7 @@ async fn test_integration_full_workflow() -> Result<()> {
 
     // Test 1: Health check
     println!("Testing health check endpoint...");
-    let response = client.get(&format!("{}/health", base_url)).send().await?;
+    let response = client.get(format!("{}/health", base_url)).send().await?;
 
     assert_eq!(response.status(), 200);
     let health: Value = response.json().await?;
@@ -49,7 +48,7 @@ async fn test_integration_full_workflow() -> Result<()> {
     // Test 2: Version endpoint
     println!("Testing version endpoint...");
     let response = client
-        .get(&format!("{}/api/v1/version", base_url))
+        .get(format!("{}/api/v1/version", base_url))
         .send()
         .await?;
 
@@ -61,7 +60,7 @@ async fn test_integration_full_workflow() -> Result<()> {
     // Test 3: Applications list endpoint
     println!("Testing applications list endpoint...");
     let response = client
-        .get(&format!("{}/api/v1/applications", base_url))
+        .get(format!("{}/api/v1/applications", base_url))
         .send()
         .await?;
 
@@ -81,7 +80,7 @@ async fn test_integration_full_workflow() -> Result<()> {
         );
 
         let response = client
-            .get(&format!(
+            .get(format!(
                 "{}/api/v1/applications/{}",
                 base_url, first_app.id
             ))
@@ -97,7 +96,7 @@ async fn test_integration_full_workflow() -> Result<()> {
     // Test 4: Applications with query parameters
     println!("Testing applications endpoint with query parameters...");
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/api/v1/applications?limit=5&status=COMPLETED",
             base_url
         ))
@@ -115,7 +114,7 @@ async fn test_integration_full_workflow() -> Result<()> {
     // Test 5: Non-existent application
     println!("Testing non-existent application endpoint...");
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/api/v1/applications/non-existent-app",
             base_url
         ))
@@ -131,7 +130,7 @@ async fn test_integration_full_workflow() -> Result<()> {
         println!("Testing jobs endpoint for app: {}", first_app.id);
 
         let response = client
-            .get(&format!(
+            .get(format!(
                 "{}/api/v1/applications/{}/jobs",
                 base_url, first_app.id
             ))
@@ -170,7 +169,7 @@ async fn test_date_filtering() -> Result<()> {
     // Test date range filtering
     println!("Testing date range filtering...");
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/api/v1/applications?minDate=2023-01-01&maxDate=2024-01-01",
             base_url
         ))
@@ -210,7 +209,7 @@ async fn test_cors_headers() -> Result<()> {
     let response = client
         .request(
             reqwest::Method::OPTIONS,
-            &format!("{}/api/v1/applications", base_url),
+            format!("{}/api/v1/applications", base_url),
         )
         .header("Origin", "http://localhost:3000")
         .header("Access-Control-Request-Method", "GET")

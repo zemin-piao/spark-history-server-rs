@@ -4,6 +4,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// Type alias for extracted fields tuple
+type ExtractedFields = (
+    Option<i64>,
+    Option<i64>,
+    Option<i64>,
+    Option<i64>,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+    Option<i32>,
+);
+
 /// Common Spark event types we handle
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SparkEventType {
@@ -142,20 +154,12 @@ impl SparkEvent {
         })
     }
 
+
     /// Extract relevant fields based on event type
     fn extract_fields(
         event_type: &SparkEventType,
         raw_event: &Value,
-    ) -> (
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<String>,
-        Option<String>,
-        Option<i64>,
-        Option<i32>,
-    ) {
+    ) -> ExtractedFields {
         match event_type {
             SparkEventType::JobStart | SparkEventType::JobEnd => {
                 let job_id = raw_event.get("Job ID").and_then(|v| v.as_i64());

@@ -62,10 +62,9 @@ impl EventProcessor {
 
         // Start HDFS scanning task
         let hdfs_clone = Arc::clone(&self.hdfs_reader);
-        let tx_clone = event_tx.clone();
 
         tokio::spawn(async move {
-            Self::hdfs_scanner_task(hdfs_clone, tx_clone).await;
+            Self::hdfs_scanner_task(hdfs_clone).await;
         });
 
         // Initial full scan
@@ -173,8 +172,7 @@ impl EventProcessor {
 
     /// HDFS scanner background task
     async fn hdfs_scanner_task(
-        hdfs_reader: Arc<HdfsReader>,
-        event_tx: mpsc::UnboundedSender<SparkEvent>,
+        hdfs_reader: Arc<HdfsReader>
     ) {
         info!("HDFS scanner task started");
 

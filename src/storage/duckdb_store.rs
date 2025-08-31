@@ -217,6 +217,7 @@ impl DuckDbStore {
     }
 
     /// Get events for a specific application
+    #[allow(dead_code)]
     pub async fn get_app_events(&self, app_id: &str) -> Result<Vec<Value>> {
         let conn = self.connection.lock().await;
 
@@ -243,6 +244,7 @@ impl DuckDbStore {
     }
 
     /// Cross-application analytics query example
+    #[allow(dead_code)]
     pub async fn get_resource_usage_summary(&self) -> Result<Vec<ResourceUsage>> {
         let conn = self.connection.lock().await;
 
@@ -305,6 +307,7 @@ impl DuckDbStore {
 
     /// Clear all data from the database (for testing purposes only)
     #[cfg(test)]
+    #[allow(dead_code)]
     pub async fn cleanup_for_testing(&self) -> Result<()> {
         let conn = self.connection.lock().await;
         conn.execute_batch("DELETE FROM events")?;
@@ -446,6 +449,7 @@ impl DuckDbStore {
 
     /// Clear all data from the database with explicit safety check
     /// Only works when ENABLE_DB_CLEANUP environment variable is set to "true"
+    #[allow(dead_code)]
     pub async fn cleanup_database(&self) -> Result<()> {
         if std::env::var("ENABLE_DB_CLEANUP").unwrap_or_default() != "true" {
             return Err(anyhow::anyhow!(
@@ -476,6 +480,7 @@ pub struct SparkEvent {
 
 /// Resource usage analytics result
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ResourceUsage {
     pub app_id: String,
     pub event_type: String,
@@ -496,7 +501,7 @@ impl SparkEvent {
             .get("Timestamp")
             .and_then(|v| v.as_i64())
             .map(|ts| {
-                use chrono::{DateTime, TimeZone, Utc};
+                use chrono::{TimeZone, Utc};
                 Utc.timestamp_millis_opt(ts)
                     .single()
                     .map(|dt| dt.to_rfc3339())

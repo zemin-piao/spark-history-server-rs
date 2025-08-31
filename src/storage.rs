@@ -56,10 +56,12 @@ impl HistoryProvider {
         Ok(provider)
     }
 
+    #[allow(dead_code)]
     pub fn set_file_reader(&mut self, file_reader: Arc<dyn FileReader>) {
         self.file_reader = file_reader;
     }
 
+    #[allow(dead_code)]
     pub async fn scan_event_logs(&self) -> Result<()> {
         self.scan_event_logs_internal().await
     }
@@ -96,14 +98,14 @@ impl HistoryProvider {
         {
             results.retain(|app| {
                 app.attempts.iter().any(|attempt| {
-                    let start_ok = min_date.map_or(true, |min| attempt.start_time >= min)
-                        && max_date.map_or(true, |max| attempt.start_time <= max);
+                    let start_ok = min_date.is_none_or(|min| attempt.start_time >= min)
+                        && max_date.is_none_or(|max| attempt.start_time <= max);
 
                     let end_ok = if attempt.completed {
-                        min_end_date.map_or(true, |min| attempt.end_time >= min)
-                            && max_end_date.map_or(true, |max| attempt.end_time <= max)
+                        min_end_date.is_none_or(|min| attempt.end_time >= min)
+                            && max_end_date.is_none_or(|max| attempt.end_time <= max)
                     } else {
-                        max_end_date.map_or(true, |max| max > Utc::now())
+                        max_end_date.is_none_or(|max| max > Utc::now())
                     };
 
                     start_ok && end_ok

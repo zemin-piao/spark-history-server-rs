@@ -5,6 +5,9 @@ use std::path::Path;
 
 use crate::models::{ApplicationAttemptInfo, ApplicationInfo};
 
+/// Type alias for application start data
+type AppStartData = (String, String, String, Option<String>, String);
+
 /// Parser for Spark event logs in JSON format
 #[derive(Clone)]
 pub struct EventLogParser;
@@ -83,10 +86,11 @@ impl EventLogParser {
         })
     }
 
+
     fn parse_application_start(
         &self,
         event: &Value,
-    ) -> Result<Option<(String, String, String, Option<String>, String)>> {
+    ) -> Result<Option<AppStartData>> {
         let app_id = event
             .get("App ID")
             .and_then(|v| v.as_str())
@@ -138,7 +142,7 @@ impl EventLogParser {
             .and_then(|arr| {
                 arr.iter().find(|item| {
                     item.as_array()
-                        .and_then(|pair| pair.get(0))
+                        .and_then(|pair| pair.first())
                         .and_then(|key| key.as_str())
                         .map(|k| k == "spark.app.version" || k == "spark.version")
                         .unwrap_or(false)

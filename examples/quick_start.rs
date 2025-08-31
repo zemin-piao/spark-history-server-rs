@@ -3,7 +3,6 @@ use spark_history_server::{
     config::{HistoryConfig, ServerConfig, Settings},
     storage::HistoryProvider,
 };
-use tokio;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

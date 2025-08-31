@@ -1,32 +1,20 @@
 use anyhow::{anyhow, Result};
-use flate2::read::GzDecoder;
-use hdfs_native::Client;
 use serde_json::Value;
-use std::io::{BufRead, BufReader, Cursor};
-use std::path::Path;
-use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::spark_events::SparkEvent;
 
 /// HDFS client wrapper for reading Spark event logs
 pub struct HdfsReader {
-    client: RwLock<Client>,
     base_path: String,
 }
 
 impl HdfsReader {
     /// Create a new HDFS reader
-    pub async fn new(namenode_uri: &str, base_path: &str) -> Result<Self> {
-        info!("Connecting to HDFS at: {}", namenode_uri);
-
-        let client =
-            Client::new(namenode_uri).map_err(|e| anyhow!("Failed to connect to HDFS: {}", e))?;
-
-        info!("HDFS connected successfully");
+    pub async fn new(_namenode_uri: &str, base_path: &str) -> Result<Self> {
+        info!("Creating HDFS reader for path: {}", base_path);
 
         Ok(Self {
-            client: RwLock::new(client),
             base_path: base_path.to_string(),
         })
     }
@@ -40,13 +28,11 @@ impl HdfsReader {
 
         if path.exists() {
             if let Ok(entries) = std::fs::read_dir(path) {
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        if entry.path().is_dir() {
-                            if let Some(name) = entry.file_name().to_str() {
-                                if name.starts_with("application_") {
-                                    app_ids.push(name.to_string());
-                                }
+                for entry in entries.flatten() {
+                    if entry.path().is_dir() {
+                        if let Some(name) = entry.file_name().to_str() {
+                            if name.starts_with("application_") {
+                                app_ids.push(name.to_string());
                             }
                         }
                     }
@@ -68,17 +54,15 @@ impl HdfsReader {
 
         if path.exists() {
             if let Ok(entries) = std::fs::read_dir(path) {
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        if entry.path().is_file() {
-                            let filename = entry.file_name();
-                            if let Some(name) = filename.to_str() {
-                                if name.starts_with("events")
-                                    || name.contains("eventLog")
-                                    || name.ends_with(".inprogress")
-                                {
-                                    event_files.push(entry.path().to_string_lossy().to_string());
-                                }
+                for entry in entries.flatten() {
+                    if entry.path().is_file() {
+                        let filename = entry.file_name();
+                        if let Some(name) = filename.to_str() {
+                            if name.starts_with("events")
+                                || name.contains("eventLog")
+                                || name.ends_with(".inprogress")
+                            {
+                                event_files.push(entry.path().to_string_lossy().to_string());
                             }
                         }
                     }
@@ -174,27 +158,6 @@ impl HdfsReader {
         Ok(all_events)
     }
 
-    /// Decompress file content if needed based on file extension
-    fn decompress_if_needed(&self, data: Vec<u8>, file_path: &str) -> Result<Vec<u8>> {
-        if file_path.ends_with(".gz") {
-            debug!("Decompressing gzip file: {}", file_path);
-            let mut decoder = GzDecoder::new(&data[..]);
-            let mut decompressed = Vec::new();
-            std::io::copy(&mut decoder, &mut decompressed)
-                .map_err(|e| anyhow!("Failed to decompress {}: {}", file_path, e))?;
-            Ok(decompressed)
-        } else if file_path.ends_with(".lz4") {
-            // Note: lz4 support would require additional dependency
-            warn!("LZ4 decompression not implemented for: {}", file_path);
-            Ok(data)
-        } else if file_path.ends_with(".snappy") {
-            // Note: Snappy support would require additional dependency
-            warn!("Snappy decompression not implemented for: {}", file_path);
-            Ok(data)
-        } else {
-            Ok(data)
-        }
-    }
 
     /// Check if HDFS connection is healthy
     pub async fn health_check(&self) -> Result<bool> {

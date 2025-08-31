@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 use spark_history_server::{
-    api::create_app, config::HistoryConfig, models::ApplicationInfo, storage::HistoryProvider,
+    api::create_app, models::ApplicationInfo, storage::HistoryProvider,
 };
 
 mod test_config;
@@ -35,7 +35,7 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
     // Test: Get applications (should find our sample app)
     println!("Testing applications endpoint with real data...");
     let response = client
-        .get(&format!("{}/api/v1/applications", base_url))
+        .get(format!("{}/api/v1/applications", base_url))
         .send()
         .await?;
 
@@ -70,7 +70,7 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
         println!("Testing specific application endpoint for: {}", test_app.id);
 
         let response = client
-            .get(&format!("{}/api/v1/applications/{}", base_url, test_app.id))
+            .get(format!("{}/api/v1/applications/{}", base_url, test_app.id))
             .send()
             .await?;
 
@@ -83,7 +83,7 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
 
         // Test the jobs endpoint too
         let response = client
-            .get(&format!(
+            .get(format!(
                 "{}/api/v1/applications/{}/jobs",
                 base_url, test_app.id
             ))
@@ -104,7 +104,7 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
 
 #[tokio::test]
 async fn test_performance_and_concurrent_requests() -> Result<()> {
-    let test_id = format!("perf_test_{}", std::process::id());
+    let _test_id = format!("perf_test_{}", std::process::id());
     let (config, _) = create_test_config();
 
     let history_provider = HistoryProvider::new(config).await?;
@@ -128,7 +128,7 @@ async fn test_performance_and_concurrent_requests() -> Result<()> {
         let handle = tokio::spawn(async move {
             let client = reqwest::Client::new();
             let response = client
-                .get(&format!("{}/api/v1/applications", url))
+                .get(format!("{}/api/v1/applications", url))
                 .send()
                 .await
                 .expect("Request failed");
