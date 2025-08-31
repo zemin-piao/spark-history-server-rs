@@ -17,16 +17,18 @@ use crate::models::{ApplicationInfo, ApplicationStatus};
 
 mod event_log;
 pub mod file_reader;
-pub mod hybrid_store;
+// pub mod hybrid_store;  // Temporarily disabled
+pub mod duckdb_store;
 
 use event_log::EventLogParser;
 pub use file_reader::FileReader;
-pub use hybrid_store::{ApplicationStore, HybridStore, InMemoryStore, RocksDbStore};
+// pub use hybrid_store::{ApplicationStore, HybridStore, InMemoryStore, RocksDbStore};  // Temporarily disabled
+pub use duckdb_store::DuckDbStore;
 
 /// History provider that manages Spark application history
 pub struct HistoryProvider {
     config: HistoryConfig,
-    store: Arc<HybridStore>,
+    store: Arc<DuckDbStore>,
     file_reader: Arc<dyn FileReader>,
     event_parser: EventLogParser,
 }
@@ -36,19 +38,11 @@ impl HistoryProvider {
         let file_reader: Arc<dyn FileReader> = Arc::new(file_reader::LocalFileReader::new());
         let event_parser = EventLogParser::new();
 
-        // Initialize hybrid store
-        let mut store = HybridStore::new();
-        
-        // Set up persistent storage if enabled
-        if config.enable_cache {
-            if let Some(ref cache_dir) = config.cache_directory {
-                info!("Initializing persistent cache at: {}", cache_dir);
-                std::fs::create_dir_all(cache_dir)?;
-                store.initialize_disk_store(cache_dir).await?;
-            } else {
-                warn!("Cache enabled but no cache directory specified. Using in-memory only.");
-            }
-        }
+        // Initialize DuckDB store
+        let cache_dir = config.cache_directory.as_deref().unwrap_or("./data");
+        std::fs::create_dir_all(cache_dir)?;
+        let db_path = std::path::Path::new(cache_dir).join("spark_events.duckdb");
+        let store = DuckDbStore::new(&db_path).await?;
 
         let provider = Self {
             config: config.clone(),
@@ -57,14 +51,8 @@ impl HistoryProvider {
             event_parser,
         };
 
-        // Initial scan - this will load into memory first
+        // Initial scan
         provider.scan_event_logs_internal().await?;
-
-        // Switch to persistent storage after initial load
-        if config.enable_cache && config.cache_directory.is_some() {
-            info!("Switching to persistent storage after initial load");
-            provider.store.switch_to_persistent().await?;
-        }
 
         // Start background refresh task
         let provider_clone = provider.clone();
@@ -238,7 +226,29 @@ impl HistoryProvider {
             })
             .collect();
 
-        self.event_parser.parse_application_from_events(events, file_path)
+        debug!("Processed {} events from {:?}", events.len(), file_path);
+
+        // Parse application info from events first
+        let app_info = self.event_parser.parse_application_from_events(events.clone(), file_path)?;
+
+        // Store individual events in DuckDB for analytics with unique IDs
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        for (i, event) in events.iter().enumerate() {
+            // Generate a unique ID using hash of app_id + file_path + index
+            let mut hasher = DefaultHasher::new();
+            app_info.id.hash(&mut hasher);
+            file_path.hash(&mut hasher);
+            i.hash(&mut hasher);
+            let event_id = (hasher.finish() as i64).abs();
+            
+            if let Err(e) = self.store.store_event(event_id, &app_info.id, event).await {
+                warn!("Failed to store event in DuckDB: {}", e);
+            }
+        }
+
+        Ok(app_info)
     }
 
     fn decompress_if_needed(&self, content: &str, file_path: &Path) -> Result<String> {

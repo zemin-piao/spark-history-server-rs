@@ -1,20 +1,13 @@
 [server]
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 18080
 max_applications = 1000
 
 [history]
-# Path to Spark event logs directory (can be local filesystem or HDFS)
-log_directory = "./spark-events"
-
-# Maximum number of applications to retain in memory
+log_directory = "/tmp/spark-events"
 max_applications = 1000
-
-# Update interval in seconds for checking new event logs
-update_interval_seconds = 10
-
-# Maximum number of applications to return in a single API request
+update_interval_seconds = 60
 max_apps_per_request = 100
-
-# Enable event log compression support (gz, lz4)
 compression_enabled = true
+cache_directory = "./data"
+enable_cache = true
