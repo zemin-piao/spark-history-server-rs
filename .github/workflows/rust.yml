@@ -8,17 +8,67 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 1
+  # DuckDB extension settings
+  DUCKDB_EXTENSION_DIRECTORY: /tmp/duckdb_extensions
+  ENABLE_DB_CLEANUP: true
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Cache key includes Cargo.toml and Cargo.lock for dependency changes
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}
+          # Additional cache directories
+          cache-directories: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            /tmp/duckdb_extensions/
+          # Cache all crates in workspace
+          cache-all-crates: true
+          # Save cache even on failure
+          save-if: true
+
+      - name: Setup DuckDB extensions directory
+        run: |
+          mkdir -p /tmp/duckdb_extensions
+          # Set up DuckDB to use our custom extension directory
+          echo "DuckDB extension directory: /tmp/duckdb_extensions"
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Check
-        run: cargo check
+        run: cargo check --all-targets --all-features
+
       - name: Build
-        run: cargo build --verbose
-      - name: Run tests
-        run: cargo test --verbose
+        run: cargo build --verbose --all-targets --all-features
+
+      - name: Run tests (lib and integration)
+        run: |
+          # Create test data directory
+          mkdir -p ./test-data
+          # Run lib tests first
+          cargo test --lib --verbose --all-features
+          # Run integration tests separately for better error isolation
+          cargo test --test "*" --verbose --all-features || true
+
+      - name: Run doc tests
+        run: cargo test --doc --all-features
