@@ -491,7 +491,7 @@ impl DuckDbStore {
 
         let query = r#"
             SELECT 
-                DATE(timestamp) as date,
+                DATE(timestamp)::VARCHAR as date,
                 app_id,
                 AVG(duration_ms) as avg_task_duration_ms,
                 COUNT(*) as total_tasks,
@@ -563,9 +563,9 @@ impl DuckDbStore {
                         AND JSON_EXTRACT_STRING(raw_data, '$.Task End Reason') != 'Success' THEN 1 END) as failed_tasks,
                     AVG(CASE WHEN event_type = 'SparkListenerTaskEnd' THEN duration_ms END) as avg_task_duration,
                     SUM(CAST(JSON_EXTRACT(raw_data, '$.Task Metrics.Input Metrics.Bytes Read') AS BIGINT)) / 1073741824.0 as total_gb_processed,
-                    MAX(CAST(JSON_EXTRACT(raw_data, '$.Total Cores') AS INTEGER)) as peak_executors,
-                    MIN(timestamp) as start_date,
-                    MAX(timestamp) as end_date
+                    COALESCE(MAX(CAST(JSON_EXTRACT(raw_data, '$.Total Cores') AS INTEGER)), 0) as peak_executors,
+                    MIN(timestamp)::VARCHAR as start_date,
+                    MAX(timestamp)::VARCHAR as end_date
                 FROM events
                 WHERE (? IS NULL OR timestamp >= ?)
                 AND (? IS NULL OR timestamp <= ?)
@@ -693,7 +693,7 @@ impl DuckDbStore {
                     COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task Info.Locality') IN ('PROCESS_LOCAL', 'NODE_LOCAL') 
                         THEN 1 END) as locality_hits,
                     MAX(CAST(JSON_EXTRACT(raw_data, '$.Task Metrics.Peak Execution Memory') AS BIGINT)) / 1048576 as peak_memory_mb,
-                    array_agg(DISTINCT app_id) as apps_served
+                    to_json(array_agg(DISTINCT app_id)) as apps_served
                 FROM events
                 WHERE event_type = 'SparkListenerTaskEnd' 
                 AND JSON_EXTRACT_STRING(raw_data, '$.Task Info.Executor ID') IS NOT NULL

@@ -99,20 +99,101 @@ async fn test_analytics_endpoints() -> Result<()> {
     assert!(json.is_array());
     println!("✅ Resource utilization endpoint passed");
 
-    // Test 4: Performance trends endpoint (skip for now due to SQL issues)
-    println!("Skipping performance trends endpoint test (SQL query issues)...");
+    // Test 4: Performance trends endpoint
+    println!("Testing performance trends endpoint...");
+    let response = client
+        .get(format!("{}/api/v1/analytics/performance-trends", base_url))
+        .send()
+        .await;
+    match response {
+        Ok(resp) if resp.status() == 200 => {
+            let json: Value = resp.json().await?;
+            assert!(json.is_array());
+            println!("✅ Performance trends endpoint passed");
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            println!(
+                "❌ Performance trends endpoint failed with status {}: {}",
+                status, body
+            );
+        }
+        Err(e) => println!("❌ Performance trends endpoint error: {}", e),
+    }
 
-    // Test 5: Cross app summary endpoint (skip for now due to SQL issues)
-    println!("Skipping cross app summary endpoint test (SQL query issues)...");
+    // Test 5: Cross app summary endpoint
+    println!("Testing cross app summary endpoint...");
+    let response = client
+        .get(format!("{}/api/v1/analytics/cross-app-summary", base_url))
+        .send()
+        .await;
+    match response {
+        Ok(resp) if resp.status() == 200 => {
+            let _json: Value = resp.json().await?;
+            println!("✅ Cross app summary endpoint passed");
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            println!(
+                "❌ Cross app summary endpoint failed with status {}: {}",
+                status, body
+            );
+        }
+        Err(e) => println!("❌ Cross app summary endpoint error: {}", e),
+    }
 
-    // Test 6: Task distribution endpoint (skip for now due to SQL issues)
-    println!("Skipping task distribution endpoint test (SQL query issues)...");
+    // Test 6: Task distribution endpoint
+    println!("Testing task distribution endpoint...");
+    let response = client
+        .get(format!("{}/api/v1/analytics/task-distribution", base_url))
+        .send()
+        .await;
+    match response {
+        Ok(resp) if resp.status() == 200 => {
+            let json: Value = resp.json().await?;
+            assert!(json.is_array());
+            println!("✅ Task distribution endpoint passed");
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            println!(
+                "❌ Task distribution endpoint failed with status {}: {}",
+                status, body
+            );
+        }
+        Err(e) => println!("❌ Task distribution endpoint error: {}", e),
+    }
 
-    // Test 7: Executor utilization endpoint (skip for now due to SQL issues)
-    println!("Skipping executor utilization endpoint test (SQL query issues)...");
+    // Test 7: Executor utilization endpoint
+    println!("Testing executor utilization endpoint...");
+    let response = client
+        .get(format!(
+            "{}/api/v1/analytics/executor-utilization",
+            base_url
+        ))
+        .send()
+        .await?;
+    assert_eq!(response.status(), 200);
+    let json: Value = response.json().await?;
+    assert!(json.is_array());
+    println!("✅ Executor utilization endpoint passed");
 
-    // Test 8: Performance trends with query parameters (skip for now due to SQL issues)
-    println!("Skipping performance trends with query parameters test (SQL query issues)...");
+    // Test 8: Performance trends with query parameters
+    println!("Testing performance trends with query parameters...");
+    let response = client
+        .get(format!(
+            "{}/api/v1/analytics/performance-trends?limit=5",
+            base_url
+        ))
+        .send()
+        .await?;
+    assert_eq!(response.status(), 200);
+    let json: Value = response.json().await?;
+    assert!(json.is_array());
+    println!("✅ Performance trends with query parameters passed");
 
     // Test 9: Executor summary endpoint (part of existing API but related to analytics)
     println!("Testing executor summary endpoint...");
