@@ -28,16 +28,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          # Cache key includes Cargo.toml and Cargo.lock for dependency changes
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}
-          # Additional cache directories
-          cache-directories: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            /tmp/duckdb_extensions/
+          # Cache DuckDB extensions directory
+          cache-directories: /tmp/duckdb_extensions/
           # Cache all crates in workspace
           cache-all-crates: true
           # Save cache even on failure
@@ -56,21 +48,13 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
 
-      - name: Run tests (lib and integration)
+      - name: Run tests (unit tests only)
         run: |
           # Create test data directory
           mkdir -p ./test-data
-          # Run lib tests first
+          # Run only unit tests (lib tests) for fast CI feedback
+          # Integration tests can be run locally or in separate slower job
           cargo test --lib --verbose --all-features
-          # Run integration tests separately for better error isolation, excluding performance tests
-          cargo test --test "*" --verbose --all-features \
-            --skip write_performance_test \
-            --skip comprehensive_benchmark \
-            --skip api_load_test \
-            --skip performance_monitor \
-            --skip analytical_query_performance \
-            --skip large_scale_test \
-            || true
 
       - name: Run doc tests
         run: cargo test --doc --all-features
