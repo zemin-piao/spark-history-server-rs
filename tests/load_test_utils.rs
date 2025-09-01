@@ -10,6 +10,12 @@ pub struct SyntheticDataGenerator {
     current_event_id: i64,
 }
 
+impl Default for SyntheticDataGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SyntheticDataGenerator {
     pub fn new() -> Self {
         let rng = rand::thread_rng();

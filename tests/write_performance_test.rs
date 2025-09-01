@@ -2,10 +2,8 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tempfile::{NamedTempFile, TempDir};
-use tokio::time::sleep;
 
 mod load_test_utils;
 mod performance_monitor;

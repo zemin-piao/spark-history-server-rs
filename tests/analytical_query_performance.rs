@@ -21,8 +21,8 @@ async fn test_analytical_query_performance_100k_apps() {
     monitor.start_monitoring(500).await;
 
     // First, create a substantial dataset similar to the 100K app test
-    let num_applications = 100_000;
-    let events_per_app = 20;
+    let num_applications = 100_000usize;
+    let events_per_app = 20usize;
     let total_events = num_applications * events_per_app;
 
     println!("📊 Setting up test dataset:");
@@ -42,8 +42,8 @@ async fn test_analytical_query_performance_100k_apps() {
     // Quick data generation (reuse pattern from large scale test)
     println!("📝 Generating test data...");
     let mut generator = SyntheticDataGenerator::new();
-    let batch_size = 20_000; // Larger batches for faster setup
-    let num_batches = (total_events + batch_size - 1) / batch_size;
+    let batch_size = 20_000usize; // Larger batches for faster setup
+    let num_batches = total_events.div_ceil(batch_size);
 
     for batch_num in 0..num_batches {
         let events_in_batch = std::cmp::min(batch_size, total_events - batch_num * batch_size);
@@ -350,8 +350,8 @@ async fn test_concurrent_analytical_queries() {
     println!();
 
     // Set up a smaller but still substantial dataset for concurrent testing
-    let num_applications = 10_000;
-    let events_per_app = 50;
+    let num_applications = 10_000usize;
+    let events_per_app = 50usize;
     let total_events = num_applications * events_per_app;
 
     let temp_db_file = NamedTempFile::new().unwrap();
@@ -367,8 +367,8 @@ async fn test_concurrent_analytical_queries() {
     let mut generator = SyntheticDataGenerator::new();
 
     // Quick setup
-    let batch_size = 25_000;
-    let num_batches = (total_events + batch_size - 1) / batch_size;
+    let batch_size = 25_000usize;
+    let num_batches = total_events.div_ceil(batch_size);
 
     for batch_num in 0..num_batches {
         let events_in_batch = std::cmp::min(batch_size, total_events - batch_num * batch_size);

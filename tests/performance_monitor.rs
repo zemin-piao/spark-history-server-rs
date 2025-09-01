@@ -6,15 +6,21 @@ use tokio::time::interval;
 
 #[derive(Debug, Clone)]
 pub struct PerformanceMetrics {
+    #[allow(dead_code)]
     pub timestamp: Instant,
+    #[allow(dead_code)]
     pub process_id: u32,
     pub cpu_usage: f32,
     pub memory_usage_bytes: u64,
+    #[allow(dead_code)]
     pub virtual_memory_bytes: u64,
     pub disk_read_bytes: u64,
     pub disk_written_bytes: u64,
+    #[allow(dead_code)]
     pub system_cpu_usage: f32,
+    #[allow(dead_code)]
     pub system_memory_total: u64,
+    #[allow(dead_code)]
     pub system_memory_used: u64,
 }
 
@@ -34,6 +40,12 @@ pub struct PerformanceMonitor {
     metrics: Arc<Mutex<Vec<PerformanceMetrics>>>,
     start_time: Instant,
     is_monitoring: Arc<Mutex<bool>>,
+}
+
+impl Default for PerformanceMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PerformanceMonitor {
@@ -168,6 +180,7 @@ impl PerformanceMonitor {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_current_metrics(&self) -> Vec<PerformanceMetrics> {
         let metrics_guard = self.metrics.lock().unwrap();
         metrics_guard.clone()
@@ -213,6 +226,7 @@ impl PerformanceSnapshot {
         println!("===========================\n");
     }
 
+    #[allow(dead_code)]
     pub fn to_csv_string(&self) -> String {
         let mut csv = String::from("timestamp,cpu_usage,memory_usage_mb,virtual_memory_mb,disk_read_mb,disk_written_mb,system_cpu,system_memory_usage_percent\n");
 
@@ -260,7 +274,7 @@ mod tests {
         // Stop and get results
         let snapshot = monitor.stop_monitoring();
 
-        assert!(snapshot.metrics.len() > 0);
+        assert!(!snapshot.metrics.is_empty());
         assert!(snapshot.duration().as_millis() > 200);
 
         snapshot.print_summary();

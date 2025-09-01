@@ -19,8 +19,8 @@ async fn test_100k_applications_load() {
     let monitor = PerformanceMonitor::new();
     monitor.start_monitoring(1000).await; // Sample every second for long test
 
-    let num_applications = 100_000;
-    let events_per_app = 20; // Average events per application
+    let num_applications = 100_000usize;
+    let events_per_app = 20usize; // Average events per application
     let total_events = num_applications * events_per_app;
 
     println!("Configuration:");
@@ -49,8 +49,8 @@ async fn test_100k_applications_load() {
     // Initialize data generator
     let mut generator = SyntheticDataGenerator::new();
 
-    let batch_size = 10_000;
-    let num_batches = (total_events + batch_size - 1) / batch_size;
+    let batch_size = 10_000usize;
+    let num_batches = total_events.div_ceil(batch_size);
 
     let mut total_insert_time = Duration::ZERO;
     let mut apps_created = std::collections::HashSet::new();
@@ -231,7 +231,7 @@ async fn test_write_performance_scaling() {
     println!("Testing how write performance scales with number of applications");
     println!();
 
-    let test_cases = vec![
+    let test_cases: Vec<(usize, usize)> = vec![
         (1_000, 100), // 1K apps, 100 events each = 100K events
         (10_000, 50), // 10K apps, 50 events each = 500K events
         (50_000, 20), // 50K apps, 20 events each = 1M events
@@ -256,8 +256,8 @@ async fn test_write_performance_scaling() {
         let mut generator = SyntheticDataGenerator::new();
 
         let start_time = Instant::now();
-        let batch_size = 5_000;
-        let num_batches = (total_events + batch_size - 1) / batch_size;
+        let batch_size = 5_000usize;
+        let num_batches = total_events.div_ceil(batch_size);
 
         for batch_num in 0..num_batches {
             let events_in_batch = std::cmp::min(batch_size, total_events - batch_num * batch_size);

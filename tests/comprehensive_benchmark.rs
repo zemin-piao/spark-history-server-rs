@@ -56,6 +56,12 @@ pub struct ComprehensiveBenchmark {
     reports: Vec<BenchmarkReport>,
 }
 
+impl Default for ComprehensiveBenchmark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ComprehensiveBenchmark {
     pub fn new() -> Self {
         Self {
@@ -84,7 +90,7 @@ impl ComprehensiveBenchmark {
         // Generate and insert data
         let mut generator = SyntheticDataGenerator::new();
         let batch_size = 10_000;
-        let num_batches = (events + batch_size - 1) / batch_size;
+        let num_batches = events.div_ceil(batch_size);
 
         for batch_idx in 0..num_batches {
             let events_in_batch = std::cmp::min(batch_size, events - batch_idx * batch_size);
@@ -141,7 +147,7 @@ impl ComprehensiveBenchmark {
         // Populate with data
         let mut generator = SyntheticDataGenerator::new();
         let batch_size = 10_000;
-        let num_batches = (events + batch_size - 1) / batch_size;
+        let num_batches = events.div_ceil(batch_size);
 
         for batch_idx in 0..num_batches {
             let events_in_batch = std::cmp::min(batch_size, events - batch_idx * batch_size);
@@ -237,7 +243,7 @@ impl ComprehensiveBenchmark {
         // Phase 1: Generate event log files
         let mut generator = SyntheticDataGenerator::new();
         let events_per_file = 10_000;
-        let num_files = (events + events_per_file - 1) / events_per_file;
+        let num_files = events.div_ceil(events_per_file);
 
         let mut generated_files = Vec::new();
         let mut file_generation_time = Duration::ZERO;
@@ -362,7 +368,7 @@ impl ComprehensiveBenchmark {
         let store = DuckDbStore::new(&db_path).await?;
         let mut generator = SyntheticDataGenerator::new();
         let batch_size = 10_000;
-        let num_batches = (events + batch_size - 1) / batch_size;
+        let num_batches = events.div_ceil(batch_size);
 
         for batch_idx in 0..num_batches {
             let events_in_batch = std::cmp::min(batch_size, events - batch_idx * batch_size);

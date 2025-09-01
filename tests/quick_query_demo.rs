@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tempfile::NamedTempFile;
 
 mod load_test_utils;
@@ -18,8 +18,8 @@ async fn test_quick_analytical_query_demo() {
     monitor.start_monitoring(250).await;
 
     // Create a reasonable dataset for quick demonstration
-    let num_applications = 5_000;
-    let events_per_app = 40;
+    let num_applications = 5_000usize;
+    let events_per_app = 40usize;
     let total_events = num_applications * events_per_app;
 
     println!("📊 Dataset:");
@@ -38,8 +38,8 @@ async fn test_quick_analytical_query_demo() {
     let mut generator = SyntheticDataGenerator::new();
 
     // Fast data generation
-    let batch_size = 25_000;
-    let num_batches = (total_events + batch_size - 1) / batch_size;
+    let batch_size = 25_000usize;
+    let num_batches = total_events.div_ceil(batch_size);
 
     print!("📝 Generating data: ");
     for batch_num in 0..num_batches {

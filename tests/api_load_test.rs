@@ -77,7 +77,7 @@ async fn setup_test_server_with_data(num_events: usize) -> (String, TempDir) {
     let mut generator = SyntheticDataGenerator::new();
 
     let batch_size = 10_000;
-    let num_batches = (num_events + batch_size - 1) / batch_size;
+    let num_batches = num_events.div_ceil(batch_size);
 
     for batch_idx in 0..num_batches {
         let events_in_batch = std::cmp::min(batch_size, num_events - batch_idx * batch_size);
