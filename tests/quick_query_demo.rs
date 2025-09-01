@@ -2,9 +2,11 @@ use std::time::Instant;
 use tempfile::NamedTempFile;
 
 mod load_test_utils;
+#[cfg(feature = "performance-tests")]
 mod performance_monitor;
 
 use load_test_utils::SyntheticDataGenerator;
+#[cfg(feature = "performance-tests")]
 use performance_monitor::PerformanceMonitor;
 use spark_history_server::storage::duckdb_store::{DuckDbStore, SparkEvent};
 
@@ -14,7 +16,9 @@ async fn test_quick_analytical_query_demo() {
     println!("Demonstrating query performance on a manageable dataset");
     println!();
 
+    #[cfg(feature = "performance-tests")]
     let monitor = PerformanceMonitor::new();
+    #[cfg(feature = "performance-tests")]
     monitor.start_monitoring(250).await;
 
     // Create a reasonable dataset for quick demonstration
@@ -141,6 +145,7 @@ async fn test_quick_analytical_query_demo() {
         query_time.as_millis()
     );
 
+    #[cfg(feature = "performance-tests")]
     let performance_snapshot = monitor.stop_monitoring();
 
     println!();
@@ -153,6 +158,7 @@ async fn test_quick_analytical_query_demo() {
     println!("  All analytical queries completed successfully!");
     println!("  Database demonstrates excellent query performance");
 
+    #[cfg(feature = "performance-tests")]
     performance_snapshot.print_summary();
 
     println!("\n✅ Quick analytical query demo completed!");

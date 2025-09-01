@@ -1,3 +1,5 @@
+#![cfg(feature = "performance-tests")]
+
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::fs;

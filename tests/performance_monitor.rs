@@ -1,3 +1,5 @@
+#![cfg(feature = "performance-tests")]
+
 use std::process;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

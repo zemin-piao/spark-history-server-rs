@@ -1,3 +1,5 @@
+#![cfg(feature = "performance-tests")]
+
 use std::collections::HashMap;
 use std::fs;
 use std::time::{Duration, Instant};

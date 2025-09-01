@@ -1,3 +1,5 @@
+#![cfg(feature = "performance-tests")]
+
 use serde_json::json;
 use std::fs;
 use std::time::{Duration, Instant};
