@@ -9,23 +9,28 @@ The Spark History Server (Rust) supports reading Spark event logs from HDFS thro
 ## Features
 
 - ✅ Read event logs from HDFS directories
-- ✅ List applications stored on HDFS
-- ✅ Support for compressed event logs (gz format)
-- ✅ Concurrent HDFS operations
+- ✅ List applications stored on HDFS  
+- ✅ Support for compressed event logs (.lz4, .snappy, .gz)
+- ✅ Concurrent HDFS operations with connection pooling
 - ✅ Error handling for network issues and missing files
 - ✅ Large directory support (thousands of applications)
-- ✅ Background refresh from HDFS
-- ✅ Mock HDFS for testing
+- ✅ Incremental scanning - only process new/modified files
+- ✅ Background refresh from HDFS with configurable intervals
+- ✅ DuckDB storage integration for analytics
+- ✅ Comprehensive testing framework
 
 ## Configuration
 
-### Enable HDFS Feature
+### HDFS Support
 
-Add the HDFS feature when building:
+HDFS support is built-in by default via the `hdfs-native` crate:
 
 ```bash
-cargo build --features hdfs
-cargo test --features hdfs
+# Build with HDFS support (default)
+cargo build --release
+
+# Run tests
+cargo test
 ```
 
 ### HDFS Configuration
@@ -43,10 +48,14 @@ compression_enabled = true
 
 ### Environment Variables
 
-Set the HDFS namenode URL:
+Optional environment variables for HDFS configuration:
 
 ```bash
+# HDFS namenode URL (can also be set in config)
 export HDFS_NAMENODE_URL="hdfs://your-namenode:9000"
+
+# Enable debug logging for HDFS operations
+export RUST_LOG="spark_history_server=debug,hdfs_native=debug"
 ```
 
 ## Usage
@@ -54,11 +63,14 @@ export HDFS_NAMENODE_URL="hdfs://your-namenode:9000"
 ### Running with HDFS
 
 ```bash
-# Build with HDFS support
-cargo build --features hdfs
+# Build the server
+cargo build --release
 
-# Run the server
-./target/debug/spark-history-server --config config/settings.toml
+# Run with HDFS configuration
+./target/release/spark-history-server --config config/settings.toml
+
+# For development with debug logging
+RUST_LOG=info cargo run -- --config config/settings.toml
 ```
 
 ### HDFS Path Formats
@@ -108,24 +120,30 @@ Run HDFS tests without a real cluster:
 To test with a real HDFS cluster:
 
 ```bash
-# Set your HDFS namenode URL
+# Set your HDFS namenode URL in config or environment
 export HDFS_NAMENODE_URL="hdfs://your-namenode:9000"
 
-# Run real HDFS tests (ignored by default)
-cargo test test_real_hdfs_connection --features hdfs --test hdfs_integration_test -- --ignored
+# Run HDFS integration tests
+cargo test --test hdfs_integration_test
+
+# Run specific HDFS tests with logging
+RUST_LOG=debug cargo test test_hdfs_operations --test hdfs_integration_test -- --nocapture
 ```
 
 ### Test Coverage
 
 The HDFS integration tests cover:
 
-- Mock HDFS file operations
-- Directory listing and file existence checks
-- Error handling (connection failures, missing files)
-- Concurrent access patterns
+- HDFS file operations and directory listing
+- Event log parsing from HDFS sources
+- Incremental scanning and change detection
+- Error handling (connection failures, missing files, timeouts)
+- Concurrent access patterns and connection pooling
 - Large directory listings (1000+ applications)
-- Compressed event log support
-- API endpoint integration
+- Compressed event log support (.lz4, .snappy, .gz)
+- DuckDB integration with HDFS data sources
+- API endpoint integration and response validation
+- Performance testing with large datasets
 
 ## Performance Considerations
 
@@ -144,16 +162,20 @@ The HDFS integration tests cover:
 ### Configuration Tuning
 
 ```toml
+[server]
+host = "0.0.0.0"
+port = 18080
+max_applications = 5000
+
 [history]
-# Increase for better performance with large clusters
+log_directory = "hdfs://namenode:9000/spark-events"
 max_applications = 5000
 max_apps_per_request = 500
-
-# Reduce refresh frequency for stable clusters  
-update_interval_seconds = 600  # 10 minutes
-
-# Enable compression to save bandwidth
+# Reduce refresh frequency for stable clusters
+update_interval_seconds = 300  # 5 minutes
 compression_enabled = true
+cache_directory = "./data"
+enable_cache = true
 ```
 
 ## Troubleshooting
@@ -184,8 +206,10 @@ Warning: HDFS operations are slow
 ```
 
 - Check network latency to HDFS cluster
-- Consider increasing connection pool size
-- Verify HDFS cluster health
+- Verify HDFS cluster health and load
+- Consider tuning `update_interval_seconds` for less frequent scans
+- Enable local caching with `enable_cache = true`
+- Monitor DuckDB write performance with `RUST_LOG=debug`
 
 ### Missing Applications
 
@@ -219,7 +243,7 @@ To migrate from local filesystem to HDFS:
 
 4. **Start the server:**
    ```bash
-   cargo run --features hdfs -- --config config/settings.toml
+   cargo run -- --config config/settings.toml
    ```
 
 ## API Compatibility
@@ -253,43 +277,66 @@ hdfs dfsadmin -setSpaceQuota /spark-events spark-history:r-x
 
 ## Examples
 
-### Basic HDFS Setup
+### Basic HDFS Setup with Analytics
 
 ```rust
 use spark_history_server::{
-    config::HistoryConfig,
-    storage::HistoryProvider,
+    config::{HistoryConfig, ServerConfig, Settings},
+    storage::duckdb_store::DuckDBStore,
 };
+use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config = HistoryConfig {
-        log_directory: "hdfs://namenode:9000/spark-events".to_string(),
-        max_applications: 1000,
-        update_interval_seconds: 300,
-        max_apps_per_request: 100,
-        compression_enabled: true,
+    let settings = Settings {
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 18080,
+            max_applications: 1000,
+        },
+        history: HistoryConfig {
+            log_directory: "hdfs://namenode:9000/spark-events".to_string(),
+            max_applications: 1000,
+            update_interval_seconds: 300,
+            max_apps_per_request: 100,
+            compression_enabled: true,
+            cache_directory: "./data".to_string(),
+            enable_cache: true,
+        },
     };
 
-    let history_provider = HistoryProvider::new(config).await?;
-    let apps = history_provider.get_applications(None, None, None, None, None, None).await?;
+    // Initialize DuckDB store with HDFS backend
+    let store = DuckDBStore::new("./data/spark_history.duckdb").await?;
     
-    println!("Found {} applications in HDFS", apps.len());
+    // Start incremental scanning from HDFS
+    // This will process event logs and populate DuckDB for analytics
+    
+    println!("Spark History Server ready with HDFS + DuckDB analytics");
     Ok(())
 }
 ```
 
-### Custom HDFS FileReader
+### HDFS File Reader Integration
 
 ```rust
-use spark_history_server::storage::file_reader::{FileReader, HdfsFileReader};
+use spark_history_server::storage::file_reader::{FileReader, create_file_reader};
+use std::path::Path;
+use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let hdfs_reader = HdfsFileReader::new("hdfs://namenode:9000")?;
+    // Create appropriate file reader based on URI scheme
+    let reader = create_file_reader("hdfs://namenode:9000/spark-events").await?;
     
-    let files = hdfs_reader.list_directory(&Path::new("/spark-events")).await?;
-    println!("Found {} event log files", files.len());
+    // List all event log files
+    let files = reader.list_directory(Path::new("/spark-events")).await?;
+    println!("Found {} event log files in HDFS", files.len());
+    
+    // Read a specific event log file
+    if let Some(first_file) = files.first() {
+        let content = reader.read_file_to_string(&first_file.path).await?;
+        println!("First event log size: {} bytes", content.len());
+    }
     
     Ok(())
 }
@@ -304,17 +351,48 @@ To contribute HDFS-related features:
 3. Run the full test suite: `./run_hdfs_tests.sh`
 4. Ensure backwards compatibility with local filesystem
 
-## Limitations
+## Current Limitations
 
-- Currently only supports HDFS (not S3, GCS, etc.)
-- Requires `hdfs-native` crate compatibility
-- No write operations (read-only history server)
-- Limited compression format support (gz only)
+- Read-only operations (no event log writes or modifications)
+- Requires network connectivity to HDFS cluster
+- Limited to `hdfs-native` crate capabilities
+- No built-in HDFS authentication management (relies on system configuration)
+- Single-threaded incremental scanning (parallelization planned)
+
+## Supported Features
+
+- ✅ Multiple compression formats (.lz4, .snappy, .gz)
+- ✅ Large directory handling with streaming
+- ✅ Connection pooling and error recovery
+- ✅ Incremental processing of only changed files
+- ✅ DuckDB integration for cross-application analytics
+- ✅ Comprehensive monitoring and logging
 
 ## Future Enhancements
 
-- S3 and other cloud storage backends
-- Advanced compression support (lz4, snappy)
-- HDFS federation support
-- Metrics and monitoring integration
+### Storage Backends
+- S3 and other cloud storage support
+- Azure Blob Storage integration
+- Google Cloud Storage support
+- Local filesystem optimizations
+
+### Performance & Scalability
+- Parallel event log processing
 - Advanced caching strategies
+- HDFS federation support
+- Connection pooling improvements
+- Query result caching
+
+### Enterprise Features
+- HDFS authentication integration (Kerberos)
+- Access control and security policies
+- Metrics and monitoring dashboards
+- Event log retention policies
+- Multi-tenant support
+
+### Analytics Enhancements
+- Real-time streaming analytics
+- Custom metric definitions
+- Advanced visualization endpoints
+- Historical trend analysis
+- Predictive performance insights

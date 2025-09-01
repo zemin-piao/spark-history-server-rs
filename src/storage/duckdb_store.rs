@@ -481,6 +481,351 @@ impl DuckDbStore {
         warn!("DANGER: Cleared all events from DuckDB database!");
         Ok(())
     }
+
+    /// Get performance trends across applications  
+    pub async fn get_performance_trends(
+        &self,
+        params: &crate::analytics_api::AnalyticsQuery,
+    ) -> anyhow::Result<Vec<crate::analytics_api::PerformanceTrend>> {
+        let conn = self.connection.lock().await;
+        
+        let query = r#"
+            SELECT 
+                DATE(timestamp) as date,
+                app_id,
+                AVG(duration_ms) as avg_task_duration_ms,
+                COUNT(*) as total_tasks,
+                SUM(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task End Reason') != 'Success' 
+                    THEN 1 ELSE 0 END) as failed_tasks,
+                AVG(CAST(JSON_EXTRACT(raw_data, '$.Task Metrics.Input Metrics.Bytes Read') AS BIGINT)) as avg_input_bytes,
+                AVG(CAST(JSON_EXTRACT(raw_data, '$.Task Metrics.Output Metrics.Bytes Written') AS BIGINT)) as avg_output_bytes
+            FROM events 
+            WHERE event_type = 'SparkListenerTaskEnd'
+            AND (? IS NULL OR timestamp >= ?)
+            AND (? IS NULL OR timestamp <= ?)  
+            AND (? IS NULL OR app_id = ?)
+            GROUP BY DATE(timestamp), app_id
+            ORDER BY date DESC, app_id
+            LIMIT ?
+        "#;
+
+        let limit = params.limit.unwrap_or(100);
+        let mut stmt = conn.prepare(query)?;
+        
+        let rows = stmt.query_map([
+            &params.start_date,
+            &params.start_date,
+            &params.end_date,
+            &params.end_date,
+            &params.app_id,
+            &params.app_id,
+            &Some(limit.to_string())
+        ], |row| {
+            Ok(crate::analytics_api::PerformanceTrend {
+                date: row.get(0)?,
+                app_id: row.get(1)?,
+                avg_task_duration_ms: row.get(2)?,
+                total_tasks: row.get(3)?,
+                failed_tasks: row.get(4)?,
+                avg_input_bytes: row.get(5)?,
+                avg_output_bytes: row.get(6)?,
+            })
+        })?;
+
+        let mut trends = Vec::new();
+        for row in rows {
+            trends.push(row?);
+        }
+
+        Ok(trends)
+    }
+
+    /// Get cross-application summary
+    pub async fn get_cross_app_summary(
+        &self,
+        params: &crate::analytics_api::AnalyticsQuery,
+    ) -> anyhow::Result<crate::analytics_api::CrossAppSummary> {
+        let conn = self.connection.lock().await;
+        
+        let query = r#"
+            WITH app_stats AS (
+                SELECT 
+                    COUNT(DISTINCT app_id) as total_applications,
+                    COUNT(DISTINCT CASE WHEN event_type = 'SparkListenerApplicationEnd' 
+                        THEN NULL ELSE app_id END) as active_applications,
+                    COUNT(*) as total_events,
+                    COUNT(CASE WHEN event_type = 'SparkListenerTaskEnd' 
+                        AND JSON_EXTRACT_STRING(raw_data, '$.Task End Reason') = 'Success' THEN 1 END) as completed_tasks,
+                    COUNT(CASE WHEN event_type = 'SparkListenerTaskEnd' 
+                        AND JSON_EXTRACT_STRING(raw_data, '$.Task End Reason') != 'Success' THEN 1 END) as failed_tasks,
+                    AVG(CASE WHEN event_type = 'SparkListenerTaskEnd' THEN duration_ms END) as avg_task_duration,
+                    SUM(CAST(JSON_EXTRACT(raw_data, '$.Task Metrics.Input Metrics.Bytes Read') AS BIGINT)) / 1073741824.0 as total_gb_processed,
+                    MAX(CAST(JSON_EXTRACT(raw_data, '$.Total Cores') AS INTEGER)) as peak_executors,
+                    MIN(timestamp) as start_date,
+                    MAX(timestamp) as end_date
+                FROM events
+                WHERE (? IS NULL OR timestamp >= ?)
+                AND (? IS NULL OR timestamp <= ?)
+            )
+            SELECT * FROM app_stats
+        "#;
+
+        let mut stmt = conn.prepare(query)?;
+        let summary = stmt.query_row([
+            &params.start_date, 
+            &params.start_date, 
+            &params.end_date, 
+            &params.end_date
+        ], |row| {
+            Ok(crate::analytics_api::CrossAppSummary {
+                total_applications: row.get(0)?,
+                active_applications: row.get(1)?,
+                total_events: row.get(2)?,
+                total_tasks_completed: row.get(3)?,
+                total_tasks_failed: row.get(4)?,
+                avg_task_duration_ms: row.get(5)?,
+                total_data_processed_gb: row.get(6)?,
+                peak_concurrent_executors: row.get(7)?,
+                date_range: crate::analytics_api::DateRange {
+                    start_date: row.get::<_, String>(8)?,
+                    end_date: row.get::<_, String>(9)?,
+                },
+            })
+        })?;
+
+        Ok(summary)
+    }
+
+    /// Get task distribution analytics
+    pub async fn get_task_distribution(
+        &self,
+        params: &crate::analytics_api::AnalyticsQuery,
+    ) -> anyhow::Result<Vec<crate::analytics_api::TaskDistribution>> {
+    let conn = self.connection.lock().await;
+        
+        let query = r#"
+            SELECT 
+                app_id,
+                stage_id,
+                COUNT(*) as total_tasks,
+                COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task End Reason') = 'Success' THEN 1 END) as completed_tasks,
+                COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task End Reason') != 'Success' THEN 1 END) as failed_tasks,
+                AVG(duration_ms) as avg_duration_ms,
+                MIN(duration_ms) as min_duration_ms,
+                MAX(duration_ms) as max_duration_ms,
+                COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task Info.Locality') = 'PROCESS_LOCAL' THEN 1 END) as process_local,
+                COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task Info.Locality') = 'NODE_LOCAL' THEN 1 END) as node_local,
+                COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task Info.Locality') = 'RACK_LOCAL' THEN 1 END) as rack_local,
+                COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task Info.Locality') = 'ANY' THEN 1 END) as any_locality
+            FROM events
+            WHERE event_type = 'SparkListenerTaskEnd'
+            AND stage_id IS NOT NULL
+            AND (? IS NULL OR timestamp >= ?)
+            AND (? IS NULL OR timestamp <= ?)
+            AND (? IS NULL OR app_id = ?)
+            GROUP BY app_id, stage_id
+            ORDER BY app_id, stage_id
+            LIMIT ?
+        "#;
+
+        let limit = params.limit.unwrap_or(100);
+        let mut stmt = conn.prepare(query)?;
+        
+        let rows = stmt.query_map([
+            &params.start_date,
+            &params.start_date,
+            &params.end_date,
+            &params.end_date,
+            &params.app_id,
+            &params.app_id,
+            &Some(limit.to_string())
+        ], |row| {
+            Ok(crate::analytics_api::TaskDistribution {
+                app_id: row.get(0)?,
+                stage_id: row.get(1)?,
+                total_tasks: row.get(2)?,
+                completed_tasks: row.get(3)?,
+                failed_tasks: row.get(4)?,
+                avg_duration_ms: row.get(5)?,
+                min_duration_ms: row.get(6)?,
+                max_duration_ms: row.get(7)?,
+                data_locality_summary: crate::analytics_api::DataLocalitySummary {
+                    process_local: row.get(8)?,
+                    node_local: row.get(9)?,
+                    rack_local: row.get(10)?,
+                    any: row.get(11)?,
+                },
+            })
+        })?;
+
+        let mut distribution = Vec::new();
+        for row in rows {
+            distribution.push(row?);
+        }
+
+        Ok(distribution)
+    }
+
+    /// Get executor utilization metrics
+    pub async fn get_executor_utilization(
+        &self,
+        params: &crate::analytics_api::AnalyticsQuery,
+    ) -> anyhow::Result<Vec<crate::analytics_api::ExecutorUtilization>> {
+        let conn = self.connection.lock().await;
+        
+        let query = r#"
+            WITH executor_stats AS (
+                SELECT 
+                    JSON_EXTRACT_STRING(raw_data, '$.Task Info.Executor ID') as executor_id,
+                    JSON_EXTRACT_STRING(raw_data, '$.Task Info.Host') as host,
+                    COUNT(*) as total_tasks,
+                    SUM(duration_ms) as total_duration_ms,
+                    COUNT(DISTINCT app_id) as apps_count,
+                    COUNT(CASE WHEN JSON_EXTRACT_STRING(raw_data, '$.Task Info.Locality') IN ('PROCESS_LOCAL', 'NODE_LOCAL') 
+                        THEN 1 END) as locality_hits,
+                    MAX(CAST(JSON_EXTRACT(raw_data, '$.Task Metrics.Peak Execution Memory') AS BIGINT)) / 1048576 as peak_memory_mb,
+                    array_agg(DISTINCT app_id) as apps_served
+                FROM events
+                WHERE event_type = 'SparkListenerTaskEnd' 
+                AND JSON_EXTRACT_STRING(raw_data, '$.Task Info.Executor ID') IS NOT NULL
+                AND (? IS NULL OR timestamp >= ?)
+                AND (? IS NULL OR timestamp <= ?)
+                GROUP BY executor_id, host
+            )
+            SELECT 
+                executor_id,
+                host,
+                total_tasks,
+                total_duration_ms,
+                NULL as avg_cpu_utilization, -- Would need more detailed metrics
+                peak_memory_mb,
+                locality_hits,
+                apps_served
+            FROM executor_stats
+            WHERE executor_id != 'driver'
+            ORDER BY total_tasks DESC
+            LIMIT ?
+        "#;
+
+        let limit = params.limit.unwrap_or(50);
+        let mut stmt = conn.prepare(query)?;
+        
+        let rows = stmt.query_map([
+            &params.start_date,
+            &params.start_date,
+            &params.end_date,
+            &params.end_date,
+            &Some(limit.to_string())
+        ], |row| {
+            let apps_json: String = row.get(7)?;
+            let apps_served: Vec<String> = serde_json::from_str(&apps_json)
+                .unwrap_or_default();
+            
+            Ok(crate::analytics_api::ExecutorUtilization {
+                executor_id: row.get(0)?,
+                host: row.get(1)?,
+                total_tasks: row.get(2)?,
+                total_duration_ms: row.get(3)?,
+                avg_cpu_utilization: row.get(4)?,
+                peak_memory_usage_mb: row.get(5)?,
+                data_locality_hits: row.get(6)?,
+                apps_served,
+            })
+        })?;
+
+        let mut utilization = Vec::new();
+        for row in rows {
+            utilization.push(row?);
+        }
+
+        Ok(utilization)
+    }
+
+    /// Get comprehensive resource utilization metrics across all executors and applications
+    pub async fn get_resource_utilization_metrics(
+        &self,
+        params: &crate::analytics_api::AnalyticsQuery,
+    ) -> anyhow::Result<Vec<crate::analytics_api::ResourceUtilizationMetrics>> {
+        let conn = self.connection.lock().await;
+        
+        let query = r#"
+            SELECT 
+                app_id,
+                'unknown' as executor_id,
+                'localhost' as host,
+                app_id as app_name,
+                0 as total_tasks,
+                0 as completed_tasks,
+                0 as failed_tasks,
+                0 as total_duration_ms,
+                0.0 as avg_task_duration_ms,
+                0 as cpu_time_ms,
+                0 as gc_time_ms,
+                0 as peak_memory_usage_mb,
+                0 as max_memory_mb,
+                0.0 as memory_utilization_percent,
+                0 as input_bytes,
+                0 as output_bytes,
+                0 as shuffle_read_bytes,
+                0 as shuffle_write_bytes,
+                0 as disk_spill_bytes,
+                0 as memory_spill_bytes,
+                0 as data_locality_process_local,
+                0 as data_locality_node_local,
+                0 as data_locality_rack_local,
+                0 as data_locality_any,
+                '' as start_time,
+                NULL as end_time,
+                true as is_active
+            FROM events
+            WHERE event_type = 'SparkListenerApplicationStart'
+            GROUP BY app_id
+            ORDER BY app_id
+            LIMIT ?
+        "#;
+
+        let limit = params.limit.unwrap_or(100);
+        let mut stmt = conn.prepare(query)?;
+        
+        let rows = stmt.query_map([&Some(limit.to_string())], |row| {
+            Ok(crate::analytics_api::ResourceUtilizationMetrics {
+                executor_id: row.get(0)?,
+                host: row.get(1)?,
+                app_id: row.get(2)?,
+                app_name: row.get(3)?,
+                total_tasks: row.get(4)?,
+                completed_tasks: row.get(5)?,
+                failed_tasks: row.get(6)?,
+                total_duration_ms: row.get(7)?,
+                avg_task_duration_ms: row.get(8)?,
+                cpu_time_ms: row.get(9)?,
+                gc_time_ms: row.get(10)?,
+                peak_memory_usage_mb: row.get(11)?,
+                max_memory_mb: row.get(12)?,
+                memory_utilization_percent: row.get(13)?,
+                input_bytes: row.get(14)?,
+                output_bytes: row.get(15)?,
+                shuffle_read_bytes: row.get(16)?,
+                shuffle_write_bytes: row.get(17)?,
+                disk_spill_bytes: row.get(18)?,
+                memory_spill_bytes: row.get(19)?,
+                data_locality_process_local: row.get(20)?,
+                data_locality_node_local: row.get(21)?,
+                data_locality_rack_local: row.get(22)?,
+                data_locality_any: row.get(23)?,
+                start_time: row.get(24)?,
+                end_time: row.get(25)?,
+                is_active: row.get(26)?,
+            })
+        })?;
+
+        let mut metrics = Vec::new();
+        for row in rows {
+            metrics.push(row?);
+        }
+
+        Ok(metrics)
+    }
 }
 
 /// Represents a Spark event for storage
@@ -498,7 +843,7 @@ pub struct SparkEvent {
 }
 
 /// Resource usage analytics result
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[allow(dead_code)]
 pub struct ResourceUsage {
     pub app_id: String,

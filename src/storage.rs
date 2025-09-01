@@ -146,6 +146,10 @@ impl HistoryProvider {
         self.store.get_executor_summary(app_id).await
     }
 
+    pub fn get_duckdb_store(&self) -> Arc<DuckDbStore> {
+        Arc::clone(&self.store)
+    }
+
     async fn scan_event_logs_internal(&self) -> Result<()> {
         let log_dir = Path::new(&self.config.log_directory);
         if !log_dir.exists() {

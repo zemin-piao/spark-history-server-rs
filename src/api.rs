@@ -10,6 +10,7 @@ use serde::Deserialize;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 
+use crate::analytics_api;
 use crate::models::{ApplicationInfo, ApplicationStatus, VersionInfo};
 use crate::storage::HistoryProvider;
 
@@ -44,6 +45,8 @@ pub async fn create_app(history_provider: HistoryProvider) -> anyhow::Result<Rou
         .route("/api/v1/version", get(get_version))
         // Health check endpoint
         .route("/health", get(health_check))
+        // Add analytics routes
+        .nest("/api/v1", analytics_api::analytics_router())
         // Add middleware
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())

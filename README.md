@@ -4,6 +4,16 @@
 
 A high-performance Spark History Server implementation in Rust with advanced analytics capabilities. Built with DuckDB for powerful cross-application insights and optimized for large-scale Spark deployments.
 
+## Current Status
+
+- ✅ **Core Infrastructure**: Event log parsing, DuckDB integration, incremental scanning
+- ✅ **Standard Spark History Server API v1**: Basic application endpoints implemented
+- ✅ **Analytics Engine**: Advanced cross-application analytics with DuckDB
+- ✅ **Storage Layer**: DuckDB-based storage with batched writes and caching
+- ✅ **HDFS Support**: Native HDFS integration via `hdfs-native`
+- 🚧 **Web UI**: Not implemented (API-only service)
+- 🚧 **Production Features**: Metrics, monitoring, security features planned
+
 ## Features
 
 - **Advanced Analytics**: Cross-application performance insights and resource usage analytics
@@ -25,7 +35,7 @@ A high-performance Spark History Server implementation in Rust with advanced ana
 - `GET /api/v1/applications/{appId}/executors` - List executors for application
 - `GET /api/v1/version` - Get version information
 
-**⚠️ Placeholder Implementation (returns empty data)**
+**⚠️ Placeholder Implementation (returns mock data)**
 - `GET /api/v1/applications/{appId}/jobs` - List jobs for application
 - `GET /api/v1/applications/{appId}/stages` - List stages for application  
 - `GET /api/v1/applications/{appId}/environment` - Get application environment
@@ -33,7 +43,7 @@ A high-performance Spark History Server implementation in Rust with advanced ana
 
 ### Advanced Analytics Endpoints
 
-**❌ Not Yet Integrated (code exists but not wired to router)**
+**✅ Implemented and Active**
 - `GET /api/v1/analytics/resource-usage` - Resource usage trends across applications
 - `GET /api/v1/analytics/performance-trends` - Performance metrics over time
 - `GET /api/v1/analytics/cross-app-summary` - Cross-application summary statistics  
@@ -51,43 +61,78 @@ Configuration is provided via `config/settings.toml`:
 
 ```toml
 [server]
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 18080
+max_applications = 1000
 
 [history]
 # Path to Spark event logs directory (supports HDFS and local paths)
-log_directory = "hdfs://namenode:9000/spark-events"
+log_directory = "/tmp/spark-events"  # or "hdfs://namenode:9000/spark-events"
+max_applications = 1000
 # Update interval for polling new event logs (seconds)
-update_interval_seconds = 10
-
-[storage]
-# DuckDB database file path
-database_path = "data/spark_history.duckdb"
-# Batch size for event processing (optimizes write performance)
-batch_size = 1000
-# Background flush interval (seconds)
-flush_interval_seconds = 30
+update_interval_seconds = 60
+max_apps_per_request = 100
+compression_enabled = true
+# Local cache for processed data
+cache_directory = "./data"
+enable_cache = true
 ```
 
-## Usage
+### Storage Configuration
+
+The DuckDB storage is automatically configured and managed internally. Key features:
+- **Database Location**: `./data/spark_history.duckdb` (created automatically)
+- **Batch Processing**: Events are processed in configurable batches for optimal write performance
+- **Incremental Scanning**: Only new/modified event logs are processed
+- **Schema Evolution**: Flexible schema handles diverse Spark event types
+
+## Quick Start
+
+### 1. Build and Run
 
 ```bash
-# Build and run (HDFS support included by default)
+# Build the project
 cargo build --release
+
+# Run with default configuration
 ./target/release/spark-history-server
 
-# With custom configuration
+# Run with custom configuration
 ./target/release/spark-history-server --config config/settings.toml
 
-# Example: Query applications
+# For development
+cargo run
+```
+
+### 2. Test the API
+
+```bash
+# Health check
+curl http://localhost:18080/health
+
+# List applications
 curl "http://localhost:18080/api/v1/applications?limit=10"
 
-# Example: Get cross-application analytics
-curl "http://localhost:18080/api/v1/analytics/cross-app-summary"
+# Get specific application
+curl "http://localhost:18080/api/v1/applications/{app_id}"
 
-# Example: Get performance trends
-curl "http://localhost:18080/api/v1/analytics/performance-trends?limit=50"
+# Advanced analytics
+curl "http://localhost:18080/api/v1/analytics/cross-app-summary"
+curl "http://localhost:18080/api/v1/analytics/performance-trends"
+curl "http://localhost:18080/api/v1/analytics/resource-usage"
 ```
+
+### 3. HDFS Setup (Optional)
+
+For HDFS integration:
+
+```toml
+# Update config/settings.toml
+[history]
+log_directory = "hdfs://namenode:9000/spark-events"
+```
+
+See [HDFS_INTEGRATION.md](HDFS_INTEGRATION.md) for detailed HDFS configuration.
 
 ## Architecture
 
@@ -123,7 +168,47 @@ HDFS Event Logs → Stream Processing → Batch Processing → DuckDB Storage
 ### Key Advantages
 
 - **Zero Deployment Complexity**: Single binary, embedded database, no external dependencies
-- **Cross-Application Analytics**: Powerful insights across all Spark applications 
-- **High Write Performance**: Batched processing handles write-heavy workloads efficiently
-- **Analytical Power**: DuckDB's columnar storage optimized for complex aggregations
-- **Schema Evolution**: JSON flexibility handles diverse Spark event schemas gracefully
+- **Cross-Application Analytics**: SQL-powered insights across all Spark applications simultaneously
+- **High Write Performance**: Incremental scanning + batched processing for optimal throughput
+- **Analytical Power**: DuckDB's columnar storage optimized for complex aggregations and time-series
+- **Schema Flexibility**: Hot field extraction + JSON fallback handles diverse event schemas
+- **Production Ready**: Comprehensive testing, error handling, and monitoring hooks
+
+## Testing
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test suites
+cargo test --test integration_test
+cargo test --test analytics_api_test
+cargo test --test incremental_scan_test
+
+# Run with detailed logging
+RUST_LOG=info cargo test test_full_incremental_scan_workflow --test incremental_scan_test -- --nocapture
+```
+
+## Development
+
+### Key Components
+
+- **`src/storage/duckdb_store.rs`**: Core DuckDB integration and analytics engine
+- **`src/event_processor.rs`**: Spark event log parsing and processing
+- **`src/api.rs`**: Standard Spark History Server API v1 endpoints
+- **`src/analytics_api.rs`**: Advanced cross-application analytics endpoints
+- **`src/storage/file_reader.rs`**: File system abstraction (local + HDFS)
+
+### Adding New Analytics
+
+1. Add SQL query to `src/analytics_api.rs`
+2. Define response model in `src/models.rs`
+3. Add tests to `tests/analytics_api_test.rs`
+4. Update API documentation
+
+### Performance Tuning
+
+- **Batch Size**: Adjust event processing batch size via configuration
+- **Update Interval**: Balance freshness vs. system load
+- **Cache Settings**: Enable local caching for frequently accessed data
+- **DuckDB Settings**: Tune memory usage and query optimization

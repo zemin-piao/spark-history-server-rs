@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+mod analytics_api;
 mod api;
 mod config;
 mod models;
