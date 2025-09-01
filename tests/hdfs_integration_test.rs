@@ -123,6 +123,7 @@ async fn test_hdfs_integration_with_history_provider() -> Result<()> {
         compression_enabled: true,
         cache_directory: None,
         enable_cache: false,
+        hdfs: None,
     };
 
     println!("✅ HDFS integration with HistoryProvider test setup completed");
@@ -230,7 +231,7 @@ async fn test_real_hdfs_connection() -> Result<()> {
     let namenode_url =
         std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "hdfs://localhost:9000".to_string());
 
-    let hdfs_reader = HdfsFileReader::new(&namenode_url)?;
+    let hdfs_reader = HdfsFileReader::new_simple(&namenode_url)?;
 
     let test_path = Path::new("/tmp/test-file");
     let exists = hdfs_reader.file_exists(test_path).await;

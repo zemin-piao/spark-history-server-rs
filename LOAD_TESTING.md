@@ -44,13 +44,13 @@ The load testing suite includes:
 ### Run All Tests
 ```bash
 # Run the complete test suite (30-60 minutes)
-./run_load_tests.sh --all
+./scripts/run_load_tests.sh --all
 ```
 
 ### Run Individual Tests
 ```bash
 # Interactive mode - select specific tests
-./run_load_tests.sh
+./scripts/run_load_tests.sh
 
 # Or run specific test modules
 cargo test test_full_pipeline_10m_events --release -- --nocapture
@@ -199,7 +199,7 @@ This testing suite validates the key architectural decisions:
 
 ### Adding New Test Scenarios
 1. Create test function in appropriate file
-2. Add to `run_load_tests.sh` script
+2. Add to `scripts/run_load_tests.sh` script
 3. Update this documentation
 
 ### Custom Event Types

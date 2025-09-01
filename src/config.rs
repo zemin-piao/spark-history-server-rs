@@ -37,6 +37,39 @@ pub struct HistoryConfig {
 
     /// Enable persistent caching with RocksDB
     pub enable_cache: bool,
+
+    /// HDFS configuration (optional)
+    pub hdfs: Option<HdfsConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HdfsConfig {
+    /// HDFS namenode URL (e.g., hdfs://namenode:9000)
+    pub namenode_url: String,
+
+    /// Connection timeout in milliseconds
+    pub connection_timeout_ms: Option<u64>,
+
+    /// Read timeout in milliseconds  
+    pub read_timeout_ms: Option<u64>,
+
+    /// Kerberos authentication configuration
+    pub kerberos: Option<KerberosConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KerberosConfig {
+    /// Kerberos principal (e.g., user@REALM.COM)
+    pub principal: String,
+
+    /// Path to keytab file
+    pub keytab_path: Option<String>,
+
+    /// Path to krb5.conf file
+    pub krb5_config_path: Option<String>,
+
+    /// Kerberos realm
+    pub realm: Option<String>,
 }
 
 impl Default for Settings {
@@ -55,6 +88,7 @@ impl Default for Settings {
                 compression_enabled: true,
                 cache_directory: Some("./cache/rocksdb".to_string()),
                 enable_cache: true,
+                hdfs: None,
             },
         }
     }

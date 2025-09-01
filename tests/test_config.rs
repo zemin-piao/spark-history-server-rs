@@ -10,6 +10,7 @@ pub fn create_test_config() -> (HistoryConfig, tempfile::TempDir) {
         compression_enabled: true,
         cache_directory: Some(temp_dir.path().to_str().unwrap().to_string()),
         enable_cache: false,
+        hdfs: None,
     };
     (config, temp_dir)
 }

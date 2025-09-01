@@ -157,17 +157,145 @@ curl "http://localhost:18080/api/v1/analytics/performance-trends"
 curl "http://localhost:18080/api/v1/analytics/resource-usage"
 ```
 
-### 3. HDFS Setup (Optional)
+### 3. HDFS Integration
 
-For HDFS integration:
+The server supports both local filesystem and HDFS for event log storage with full Kerberos authentication:
 
-```toml
-# Update config/settings.toml
-[history]
-log_directory = "hdfs://namenode:9000/spark-events"
+#### 🏗️ **Argument-Based Reader Selection**
+
+**Local Filesystem (Default):**
+```bash
+# Local filesystem mode
+./target/release/spark-history-server --log-directory ./spark-events
 ```
 
-See [HDFS_INTEGRATION.md](HDFS_INTEGRATION.md) for detailed HDFS configuration.
+**HDFS Without Authentication:**
+```bash
+# Basic HDFS mode
+./target/release/spark-history-server \
+  --hdfs \
+  --hdfs-namenode hdfs://namenode:9000 \
+  --log-directory /spark-events
+```
+
+**HDFS with Kerberos Authentication:**
+```bash
+# HDFS with Kerberos keytab
+./target/release/spark-history-server \
+  --hdfs \
+  --hdfs-namenode hdfs://secure-namenode:9000 \
+  --kerberos-principal spark@EXAMPLE.COM \
+  --keytab-path /etc/security/keytabs/spark.keytab \
+  --krb5-config /etc/krb5.conf \
+  --kerberos-realm EXAMPLE.COM \
+  --log-directory /hdfs/spark-events
+```
+
+**Custom Timeouts:**
+```bash
+# HDFS with custom timeout settings
+./target/release/spark-history-server \
+  --hdfs \
+  --hdfs-namenode hdfs://namenode:9000 \
+  --hdfs-connection-timeout 60000 \  # 60 seconds
+  --hdfs-read-timeout 120000 \      # 2 minutes
+  --log-directory /hdfs/spark-events
+```
+
+#### 🔐 **Environment Variable Support**
+
+All HDFS settings support environment variable fallbacks:
+
+```bash
+# Set environment variables
+export HDFS_NAMENODE_URL=hdfs://secure-namenode:9000
+export KERBEROS_PRINCIPAL=spark@EXAMPLE.COM  
+export KERBEROS_KEYTAB=/etc/security/keytabs/spark.keytab
+export KRB5_CONFIG=/etc/krb5.conf
+export KERBEROS_REALM=EXAMPLE.COM
+
+# Start with minimal arguments
+./target/release/spark-history-server --hdfs --log-directory /hdfs/spark-events
+```
+
+#### 📝 **Configuration File Integration**
+
+HDFS can also be configured via `config/settings.toml`:
+
+```toml
+[history]
+log_directory = "/hdfs/spark-events"
+
+[history.hdfs]
+namenode_url = "hdfs://secure-namenode:9000"
+connection_timeout_ms = 30000
+read_timeout_ms = 60000
+
+[history.hdfs.kerberos]
+principal = "spark@EXAMPLE.COM"
+keytab_path = "/etc/security/keytabs/spark.keytab"
+krb5_config_path = "/etc/krb5.conf"
+realm = "EXAMPLE.COM"
+```
+
+#### ⚡ **Runtime Reader Switching**
+
+Switch between local and HDFS readers at runtime without recompiling:
+
+```bash
+# Start with local reader
+./target/release/spark-history-server --log-directory ./test-data
+
+# Switch to HDFS by changing arguments
+./target/release/spark-history-server --hdfs --hdfs-namenode hdfs://namenode:9000
+```
+
+#### 🧪 **HDFS Testing**
+
+Comprehensive test suite with mock and real HDFS support:
+
+```bash
+# Run all HDFS tests (automated test runner)
+./scripts/run-hdfs-tests.sh
+
+# Individual test categories:
+# 1. Basic Integration Tests
+cargo test hdfs_integration_test --release
+
+# 2. Comprehensive HDFS Operations
+cargo test test_hdfs_comprehensive_file_operations --release
+cargo test test_hdfs_error_handling_scenarios --release
+cargo test test_hdfs_concurrent_operations --release
+
+# 3. Kerberos Authentication Tests  
+cargo test test_kerberos_configuration --release
+cargo test test_kerberos_valid_authentication --release
+cargo test test_kerberos_expired_tickets --release
+cargo test test_kerberos_network_errors --release
+
+# 4. Argument-Based Reader Selection
+cargo test test_argument_based_local_reader_selection --release
+cargo test test_runtime_reader_switching --release
+cargo test test_configuration_precedence --release
+
+# 5. Real HDFS Tests (requires actual HDFS cluster)
+# Set environment variables first:
+# export HDFS_NAMENODE_URL=hdfs://your-namenode:9000
+# export SPARK_EVENTS_DIR=/your/spark/events
+# For Kerberos: KERBEROS_PRINCIPAL, KERBEROS_KEYTAB, etc.
+
+cargo test test_real_hdfs_connection_health --ignored
+cargo test test_real_hdfs_kerberos_authentication --ignored  
+cargo test test_real_hdfs_spark_event_logs --ignored
+cargo test test_real_hdfs_performance_benchmarks --ignored
+```
+
+**Test Categories:**
+- **Mock Tests**: 25+ tests using simulated HDFS - no infrastructure required
+- **Integration Tests**: End-to-end testing with HistoryProvider
+- **Kerberos Tests**: All authentication scenarios (valid, expired, invalid, keytab vs ticket cache)
+- **Performance Tests**: Concurrent operations, timeout handling, error recovery
+- **Real HDFS Tests**: Live cluster validation (marked `#[ignore]` - run manually)
 
 ## Architecture
 
@@ -176,10 +304,13 @@ The Spark History Server is built around a modern, analytics-first architecture 
 ### Core Components
 
 1. **Log Processing Engine**
-   - **HDFS Integration**: Native HDFS support using `hdfs-native` for efficient access to event logs
-   - **Event Stream Processing**: Asynchronous processing of compressed event logs (.lz4, .snappy)
-   - **Batch Processing**: Optimized batch writes to DuckDB for high throughput
+   - **HDFS Integration**: Native HDFS support using `hdfs-native` with full Kerberos authentication
+   - **Argument-Based Reader Selection**: Runtime switching between local filesystem and HDFS readers
+   - **Kerberos Security**: Enterprise-grade authentication with keytab and ticket cache support
+   - **Event Stream Processing**: Asynchronous processing of compressed event logs (.lz4, .snappy, .gz)
+   - **Batch Processing**: Optimized batch writes to DuckDB with configurable timeouts
    - **Schema Flexibility**: Handles 10+ Spark event types with hot field extraction + JSON fallback
+   - **Health Monitoring**: Automated HDFS connectivity and authentication health checks
 
 2. **DuckDB Storage Layer** 
    - **Embedded Analytical Database**: Single-file database optimized for analytics workloads
@@ -195,13 +326,18 @@ The Spark History Server is built around a modern, analytics-first architecture 
 ### Data Flow
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   HDFS/Storage  │ -> │  Event Processor │ -> │   DuckDB Store   │ -> │   API Server    │
-│                 │    │                  │    │                  │    │                 │
-│ • Event Logs    │    │ • Incremental    │    │ • Events Table   │    │ • REST API      │
-│ • .lz4/.snappy  │    │   Scanning       │    │ • JSON + Hot     │    │ • Analytics     │
-│ • .inprogress   │    │ • Batch Writing  │    │   Fields         │    │ • Cross-App     │
-└─────────────────┘    └──────────────────┘    └──────────────────┘    └─────────────────┘
+┌─────────────────────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│        Storage Layer            │ -> │  Event Processor │ -> │   DuckDB Store   │ -> │   API Server    │
+│                                 │    │                  │    │                  │    │                 │
+│ HDFS (with Kerberos):           │    │ • Argument-based │    │ • Events Table   │    │ • REST API      │
+│ • hdfs://namenode:9000          │    │   Reader Switch  │    │ • JSON + Hot     │    │ • Analytics     │ 
+│ • /spark-events/*.lz4           │    │ • Incremental    │    │   Fields         │    │ • Cross-App     │
+│ • Kerberos Authentication       │    │   Scanning       │    │ • Timeout        │    │ • Health Check  │
+│                                 │    │ • Batch Writing  │    │   Handling       │    │                 │
+│ Local FileSystem:               │    │ • Health Checks  │    │ • Schema Flex    │    │                 │
+│ • ./spark-events/*.snappy       │    │                  │    │                  │    │                 │
+│ • .inprogress files             │    │                  │    │                  │    │                 │
+└─────────────────────────────────┘    └──────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
 ### 🏆 **Key Advantages for Analytics**
@@ -255,10 +391,10 @@ Run comprehensive performance tests:
 
 ```bash
 # Quick load testing demo
-./run_load_tests.sh
+./scripts/run_load_tests.sh
 
 # Full enterprise-scale test suite (30-60 minutes)
-./run_load_tests.sh --all
+./scripts/run_load_tests.sh --all
 
 # Specific tests
 cargo test test_100k_applications_load --release -- --nocapture
@@ -284,11 +420,24 @@ cargo test
 
 # Run specific test suites
 cargo test --test integration_test
-cargo test --test analytics_api_test
+cargo test --test analytics_api_test  
 cargo test --test incremental_scan_test
+
+# Run HDFS integration tests
+./scripts/run-hdfs-tests.sh
+
+# Run specific HDFS test categories
+cargo test hdfs --release                    # All HDFS-related tests
+cargo test kerberos --release               # Kerberos authentication tests
+cargo test argument_based --release         # Runtime reader selection tests
+
+# Run real HDFS tests (requires HDFS cluster)
+export HDFS_NAMENODE_URL=hdfs://your-namenode:9000
+cargo test test_real_hdfs --ignored
 
 # Run with detailed logging
 RUST_LOG=info cargo test test_full_incremental_scan_workflow --test incremental_scan_test -- --nocapture
+RUST_LOG=debug cargo test test_kerberos_valid_authentication -- --nocapture
 ```
 
 ## Development

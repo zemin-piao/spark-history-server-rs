@@ -24,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             compression_enabled: true,
             cache_directory: None,
             enable_cache: false,
+            hdfs: None,
         },
     };
 

@@ -104,6 +104,7 @@ async fn setup_test_server_with_data(num_events: usize) -> (String, TempDir) {
         compression_enabled: true,
         cache_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         enable_cache: false, // Disable cache for testing
+        hdfs: None,
     };
 
     let history_provider = HistoryProvider::new(history_settings).await.unwrap();

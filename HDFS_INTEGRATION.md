@@ -112,7 +112,7 @@ Or flat structure:
 Run HDFS tests without a real cluster:
 
 ```bash
-./run_hdfs_tests.sh
+./scripts/run_hdfs_tests.sh
 ```
 
 ### Real HDFS Testing
@@ -238,7 +238,7 @@ To migrate from local filesystem to HDFS:
 3. **Test the migration:**
    ```bash
    cargo test --features hdfs
-   ./run_hdfs_tests.sh
+   ./scripts/run_hdfs_tests.sh
    ```
 
 4. **Start the server:**
@@ -348,7 +348,7 @@ To contribute HDFS-related features:
 
 1. Add tests to `tests/hdfs_integration_test.rs`
 2. Update this documentation
-3. Run the full test suite: `./run_hdfs_tests.sh`
+3. Run the full test suite: `./scripts/run_hdfs_tests.sh`
 4. Ensure backwards compatibility with local filesystem
 
 ## Current Limitations

@@ -14,7 +14,7 @@ pub mod file_reader;
 pub mod duckdb_store;
 
 use event_log::EventLogParser;
-pub use file_reader::FileReader;
+pub use file_reader::{FileReader, create_file_reader};
 // pub use hybrid_store::{ApplicationStore, HybridStore, InMemoryStore, RocksDbStore};  // Temporarily disabled
 pub use duckdb_store::DuckDbStore;
 
@@ -28,7 +28,9 @@ pub struct HistoryProvider {
 
 impl HistoryProvider {
     pub async fn new(config: HistoryConfig) -> Result<Self> {
-        let file_reader: Arc<dyn FileReader> = Arc::new(file_reader::LocalFileReader::new());
+        let file_reader: Arc<dyn FileReader> = Arc::from(
+            create_file_reader(&config.log_directory, config.hdfs.as_ref()).await?
+        );
         let event_parser = EventLogParser::new();
 
         // Initialize DuckDB store
@@ -152,7 +154,9 @@ impl HistoryProvider {
 
     async fn scan_event_logs_internal(&self) -> Result<()> {
         let log_dir = Path::new(&self.config.log_directory);
-        if !log_dir.exists() {
+        
+        // For HDFS, we don't check if directory exists locally
+        if self.config.hdfs.is_none() && !log_dir.exists() {
             return Err(anyhow!(
                 "Log directory does not exist: {}",
                 self.config.log_directory
@@ -162,21 +166,31 @@ impl HistoryProvider {
         info!("Scanning event logs in: {}", self.config.log_directory);
         let mut app_count = 0;
 
-        for entry in fs::read_dir(log_dir)? {
-            let entry = entry?;
-            let path = entry.path();
+        // Use file_reader for listing directory (works for both local and HDFS)
+        let entries = match self.file_reader.list_directory(log_dir).await {
+            Ok(entries) => entries,
+            Err(e) => {
+                warn!("Failed to list directory {}: {}", self.config.log_directory, e);
+                return Ok(());
+            }
+        };
 
-            if path.is_dir() {
-                // Single application directory
-                if let Ok(app_info) = self.parse_application_directory(&path).await {
+        for entry_name in entries {
+            let entry_path = log_dir.join(&entry_name);
+
+            // Check if it's an application directory or event log file
+            if entry_name.starts_with("app-") || entry_name.starts_with("application_") {
+                // Try to parse as application directory first
+                if let Ok(app_info) = self.parse_application_directory(&entry_path).await {
                     self.store.put(&app_info.id.clone(), app_info).await?;
                     app_count += 1;
+                    continue;
                 }
-            } else if path.extension().and_then(|s| s.to_str()) == Some("inprogress")
-                || path.to_string_lossy().contains("eventLog")
-            {
-                // Single event log file
-                if let Ok(app_info) = self.parse_event_log_file(&path).await {
+            }
+            
+            // Try to parse as single event log file
+            if entry_name.ends_with(".inprogress") || entry_name.contains("eventLog") {
+                if let Ok(app_info) = self.parse_event_log_file(&entry_path).await {
                     self.store.put(&app_info.id.clone(), app_info).await?;
                     app_count += 1;
                 }
