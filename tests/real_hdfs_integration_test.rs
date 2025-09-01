@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 use spark_history_server::{
-    config::{HdfsConfig, KerberosConfig, HistoryConfig},
+    config::{HdfsConfig, HistoryConfig, KerberosConfig},
     storage::{
         file_reader::{create_file_reader, FileReader, HdfsFileReader},
         HistoryProvider,
@@ -51,7 +51,10 @@ async fn test_real_hdfs_connection_health() -> Result<()> {
 
     let hdfs_config = get_test_hdfs_config();
     println!("HDFS Namenode: {}", hdfs_config.namenode_url);
-    println!("Connection Timeout: {:?}ms", hdfs_config.connection_timeout_ms);
+    println!(
+        "Connection Timeout: {:?}ms",
+        hdfs_config.connection_timeout_ms
+    );
     println!("Read Timeout: {:?}ms", hdfs_config.read_timeout_ms);
     println!();
 
@@ -60,7 +63,7 @@ async fn test_real_hdfs_connection_health() -> Result<()> {
 
     println!("Performing HDFS health check...");
     let health_result = timeout(Duration::from_secs(60), hdfs_reader.health_check()).await;
-    
+
     match health_result {
         Ok(Ok(healthy)) => {
             assert!(healthy);
@@ -105,7 +108,7 @@ async fn test_real_hdfs_directory_operations() -> Result<()> {
 
     // Test common Spark directories
     let test_directories = vec!["/tmp", "/user", "/spark-events", "/var/log"];
-    
+
     for dir in test_directories {
         println!("Testing directory: {}", dir);
         match file_reader.list_directory(Path::new(dir)).await {
@@ -138,12 +141,15 @@ async fn test_real_hdfs_kerberos_authentication() -> Result<()> {
     println!();
 
     let hdfs_config = get_test_hdfs_config_with_kerberos();
-    
+
     println!("HDFS Configuration:");
     println!("  Namenode: {}", hdfs_config.namenode_url);
-    println!("  Connection Timeout: {:?}ms", hdfs_config.connection_timeout_ms);
+    println!(
+        "  Connection Timeout: {:?}ms",
+        hdfs_config.connection_timeout_ms
+    );
     println!("  Read Timeout: {:?}ms", hdfs_config.read_timeout_ms);
-    
+
     if let Some(kerberos) = &hdfs_config.kerberos {
         println!("  Kerberos Principal: {}", kerberos.principal);
         println!("  Keytab Path: {:?}", kerberos.keytab_path);
@@ -157,7 +163,7 @@ async fn test_real_hdfs_kerberos_authentication() -> Result<()> {
 
     println!("Performing Kerberos health check...");
     let health_result = timeout(Duration::from_secs(90), hdfs_reader.health_check()).await;
-    
+
     match health_result {
         Ok(Ok(healthy)) => {
             assert!(healthy);
@@ -204,9 +210,9 @@ async fn test_real_hdfs_spark_event_logs() -> Result<()> {
     println!("========================================");
     println!();
 
-    let spark_events_dir = std::env::var("SPARK_EVENTS_DIR")
-        .unwrap_or_else(|_| "/spark-events".to_string());
-    
+    let spark_events_dir =
+        std::env::var("SPARK_EVENTS_DIR").unwrap_or_else(|_| "/spark-events".to_string());
+
     println!("Spark Events Directory: {}", spark_events_dir);
     println!();
 
@@ -214,8 +220,10 @@ async fn test_real_hdfs_spark_event_logs() -> Result<()> {
     let file_reader = create_file_reader(&spark_events_dir, Some(&hdfs_config)).await?;
 
     println!("Scanning for Spark event logs...");
-    let entries = file_reader.list_directory(Path::new(&spark_events_dir)).await?;
-    
+    let entries = file_reader
+        .list_directory(Path::new(&spark_events_dir))
+        .await?;
+
     if entries.is_empty() {
         println!("⚠️ No event logs found in {}", spark_events_dir);
         println!("   Make sure Spark applications have run and event logging is enabled");
@@ -223,38 +231,49 @@ async fn test_real_hdfs_spark_event_logs() -> Result<()> {
     }
 
     println!("Found {} potential event log entries:", entries.len());
-    
+
     let mut processed_apps = 0;
     let mut processed_files = 0;
 
     for (i, entry) in entries.iter().take(10).enumerate() {
         println!();
         println!("{}. Processing: {}", i + 1, entry);
-        
+
         let entry_path = format!("{}/{}", spark_events_dir, entry);
-        
+
         if entry.starts_with("app-") || entry.starts_with("application_") {
             // This looks like an application directory
             println!("   Type: Application Directory");
-            
+
             match file_reader.list_directory(Path::new(&entry_path)).await {
                 Ok(app_files) => {
                     println!("   Files: {} event log files", app_files.len());
-                    
+
                     for app_file in app_files.iter().take(3) {
                         if app_file.starts_with("events_") || app_file == "eventLog" {
                             let file_path = format!("{}/{}", entry_path, app_file);
                             match file_reader.read_file(Path::new(&file_path)).await {
                                 Ok(content) => {
                                     let lines = content.lines().count();
-                                    println!("     - {}: {} lines ({} bytes)", app_file, lines, content.len());
+                                    println!(
+                                        "     - {}: {} lines ({} bytes)",
+                                        app_file,
+                                        lines,
+                                        content.len()
+                                    );
                                     processed_files += 1;
-                                    
+
                                     // Try to parse first few events
                                     for (line_num, line) in content.lines().take(3).enumerate() {
-                                        if let Ok(event) = serde_json::from_str::<serde_json::Value>(line) {
+                                        if let Ok(event) =
+                                            serde_json::from_str::<serde_json::Value>(line)
+                                        {
                                             if let Some(event_type) = event.get("Event") {
-                                                println!("       Line {}: {}", line_num + 1, event_type);
+                                                println!(
+                                                    "       Line {}: {}",
+                                                    line_num + 1,
+                                                    event_type
+                                                );
                                             }
                                         }
                                     }
@@ -274,7 +293,7 @@ async fn test_real_hdfs_spark_event_logs() -> Result<()> {
         } else if entry.ends_with(".inprogress") {
             // This looks like an in-progress event log file
             println!("   Type: In-Progress Event Log");
-            
+
             match file_reader.read_file(Path::new(&entry_path)).await {
                 Ok(content) => {
                     let lines = content.lines().count();
@@ -311,9 +330,9 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     println!("========================================");
     println!();
 
-    let spark_events_dir = std::env::var("SPARK_EVENTS_DIR")
-        .unwrap_or_else(|_| "/spark-events".to_string());
-    
+    let spark_events_dir =
+        std::env::var("SPARK_EVENTS_DIR").unwrap_or_else(|_| "/spark-events".to_string());
+
     let hdfs_config = if std::env::var("KERBEROS_PRINCIPAL").is_ok() {
         get_test_hdfs_config_with_kerberos()
     } else {
@@ -334,16 +353,27 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     println!("Creating HistoryProvider with HDFS configuration...");
     println!("  Events Directory: {}", spark_events_dir);
     println!("  Max Applications: {}", history_config.max_applications);
-    println!("  Update Interval: {}s", history_config.update_interval_seconds);
+    println!(
+        "  Update Interval: {}s",
+        history_config.update_interval_seconds
+    );
     println!();
 
     println!("Initializing HistoryProvider (this may take a while)...");
     let start_time = std::time::Instant::now();
-    
-    let history_provider = match timeout(Duration::from_secs(300), HistoryProvider::new(history_config)).await {
+
+    let history_provider = match timeout(
+        Duration::from_secs(300),
+        HistoryProvider::new(history_config),
+    )
+    .await
+    {
         Ok(Ok(provider)) => {
             let init_duration = start_time.elapsed();
-            println!("✅ HistoryProvider initialized in {:.2}s", init_duration.as_secs_f64());
+            println!(
+                "✅ HistoryProvider initialized in {:.2}s",
+                init_duration.as_secs_f64()
+            );
             provider
         }
         Ok(Err(e)) => {
@@ -358,29 +388,31 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
 
     println!();
     println!("Testing application retrieval...");
-    let applications = history_provider.get_applications(
-        Some(10), // Limit to 10 applications
-        None,     // No status filter
-        None,     // No date filters
-        None,
-        None,
-        None,
-    ).await?;
+    let applications = history_provider
+        .get_applications(
+            Some(10), // Limit to 10 applications
+            None,     // No status filter
+            None,     // No date filters
+            None,
+            None,
+            None,
+        )
+        .await?;
 
     println!("Retrieved {} applications:", applications.len());
-    
+
     for (i, app) in applications.iter().enumerate() {
         println!("  {}. Application: {}", i + 1, app.id);
         println!("     Name: {}", app.name);
         println!("     Attempts: {}", app.attempts.len());
-        
+
         if let Some(attempt) = app.attempts.first() {
             println!("     Start Time: {}", attempt.start_time);
             println!("     End Time: {}", attempt.end_time);
             println!("     Duration: {:.2}s", attempt.duration);
             println!("     Completed: {}", attempt.completed);
         }
-        
+
         println!();
     }
 
@@ -388,10 +420,13 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
         println!("Testing individual application retrieval...");
         let test_app = &applications[0];
         let app_detail = history_provider.get_application(&test_app.id).await?;
-        
+
         match app_detail {
             Some(app) => {
-                println!("✅ Successfully retrieved application details for {}", app.id);
+                println!(
+                    "✅ Successfully retrieved application details for {}",
+                    app.id
+                );
                 println!("   Name: {}", app.name);
                 println!("   Attempts: {}", app.attempts.len());
             }
@@ -403,11 +438,17 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
         println!();
         println!("Testing executor information...");
         let executors = history_provider.get_executors(&test_app.id).await?;
-        println!("Found {} executors for application {}", executors.len(), test_app.id);
-        
+        println!(
+            "Found {} executors for application {}",
+            executors.len(),
+            test_app.id
+        );
+
         for executor in executors.iter().take(3) {
-            println!("  Executor {}: {} cores, {} MB memory", 
-                     executor.id, executor.total_cores, executor.max_memory);
+            println!(
+                "  Executor {}: {} cores, {} MB memory",
+                executor.id, executor.total_cores, executor.max_memory
+            );
         }
     }
 
@@ -419,7 +460,10 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
 
     println!();
     println!("Performance Summary:");
-    println!("  Total initialization time: {:.2}s", start_time.elapsed().as_secs_f64());
+    println!(
+        "  Total initialization time: {:.2}s",
+        start_time.elapsed().as_secs_f64()
+    );
     println!("  Applications loaded: {}", applications.len());
     println!("  Storage backend: HDFS + DuckDB");
 
@@ -447,33 +491,49 @@ async fn test_real_hdfs_performance_benchmarks() -> Result<()> {
     let start = std::time::Instant::now();
     let root_entries = file_reader.list_directory(Path::new("/")).await?;
     let list_duration = start.elapsed();
-    println!("  Result: {} entries in {:.3}s", root_entries.len(), list_duration.as_secs_f64());
-    println!("  Rate: {:.1} entries/second", root_entries.len() as f64 / list_duration.as_secs_f64());
+    println!(
+        "  Result: {} entries in {:.3}s",
+        root_entries.len(),
+        list_duration.as_secs_f64()
+    );
+    println!(
+        "  Rate: {:.1} entries/second",
+        root_entries.len() as f64 / list_duration.as_secs_f64()
+    );
     println!();
 
     // Benchmark 2: File existence checks
     println!("Benchmark 2: File Existence Checks");
-    let test_paths = vec!["/tmp", "/user", "/var", "/opt", "/etc", "/home", "/root", "/bin", "/usr", "/dev"];
+    let test_paths = vec![
+        "/tmp", "/user", "/var", "/opt", "/etc", "/home", "/root", "/bin", "/usr", "/dev",
+    ];
     let start = std::time::Instant::now();
     let mut exists_count = 0;
-    
+
     for path in &test_paths {
         if file_reader.file_exists(Path::new(path)).await {
             exists_count += 1;
         }
     }
-    
+
     let exists_duration = start.elapsed();
-    println!("  Result: {}/{} paths exist", exists_count, test_paths.len());
+    println!(
+        "  Result: {}/{} paths exist",
+        exists_count,
+        test_paths.len()
+    );
     println!("  Duration: {:.3}s", exists_duration.as_secs_f64());
-    println!("  Rate: {:.1} checks/second", test_paths.len() as f64 / exists_duration.as_secs_f64());
+    println!(
+        "  Rate: {:.1} checks/second",
+        test_paths.len() as f64 / exists_duration.as_secs_f64()
+    );
     println!();
 
     // Benchmark 3: Concurrent operations
     println!("Benchmark 3: Concurrent Directory Listings");
     let start = std::time::Instant::now();
     let mut handles = Vec::new();
-    
+
     for i in 0..5 {
         let test_hdfs_config = get_test_hdfs_config();
         let reader = Arc::new(create_file_reader("/", Some(&test_hdfs_config)).await?);
@@ -488,30 +548,52 @@ async fn test_real_hdfs_performance_benchmarks() -> Result<()> {
 
     let mut total_entries = 0;
     let mut successful_ops = 0;
-    
+
     for handle in handles {
         match handle.await? {
             (i, Ok(entries), duration) => {
                 total_entries += entries.len();
                 successful_ops += 1;
-                println!("  Operation {}: {} entries in {:.3}s", i, entries.len(), duration.as_secs_f64());
+                println!(
+                    "  Operation {}: {} entries in {:.3}s",
+                    i,
+                    entries.len(),
+                    duration.as_secs_f64()
+                );
             }
             (i, Err(e), duration) => {
-                println!("  Operation {}: FAILED in {:.3}s - {}", i, duration.as_secs_f64(), e);
+                println!(
+                    "  Operation {}: FAILED in {:.3}s - {}",
+                    i,
+                    duration.as_secs_f64(),
+                    e
+                );
             }
         }
     }
-    
+
     let concurrent_duration = start.elapsed();
     println!("  Summary: {}/{} operations successful", successful_ops, 5);
     println!("  Total time: {:.3}s", concurrent_duration.as_secs_f64());
-    println!("  Average entries per operation: {:.1}", total_entries as f64 / successful_ops as f64);
+    println!(
+        "  Average entries per operation: {:.1}",
+        total_entries as f64 / successful_ops as f64
+    );
     println!();
 
     println!("Performance Summary:");
-    println!("  Directory Listing: {:.1} entries/second", root_entries.len() as f64 / list_duration.as_secs_f64());
-    println!("  File Existence: {:.1} checks/second", test_paths.len() as f64 / exists_duration.as_secs_f64());
-    println!("  Concurrent Ops: {:.1} ops/second", successful_ops as f64 / concurrent_duration.as_secs_f64());
+    println!(
+        "  Directory Listing: {:.1} entries/second",
+        root_entries.len() as f64 / list_duration.as_secs_f64()
+    );
+    println!(
+        "  File Existence: {:.1} checks/second",
+        test_paths.len() as f64 / exists_duration.as_secs_f64()
+    );
+    println!(
+        "  Concurrent Ops: {:.1} ops/second",
+        successful_ops as f64 / concurrent_duration.as_secs_f64()
+    );
 
     println!();
     println!("✅ Real HDFS performance benchmarks COMPLETED");
@@ -540,10 +622,22 @@ async fn test_manual_hdfs_validation() -> Result<()> {
     println!();
 
     println!("Current Environment:");
-    println!("  HDFS_NAMENODE_URL: {}", std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "NOT SET".to_string()));
-    println!("  SPARK_EVENTS_DIR: {}", std::env::var("SPARK_EVENTS_DIR").unwrap_or_else(|_| "NOT SET".to_string()));
-    println!("  KERBEROS_PRINCIPAL: {}", std::env::var("KERBEROS_PRINCIPAL").unwrap_or_else(|_| "NOT SET".to_string()));
-    println!("  KERBEROS_KEYTAB: {}", std::env::var("KERBEROS_KEYTAB").unwrap_or_else(|_| "NOT SET".to_string()));
+    println!(
+        "  HDFS_NAMENODE_URL: {}",
+        std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "NOT SET".to_string())
+    );
+    println!(
+        "  SPARK_EVENTS_DIR: {}",
+        std::env::var("SPARK_EVENTS_DIR").unwrap_or_else(|_| "NOT SET".to_string())
+    );
+    println!(
+        "  KERBEROS_PRINCIPAL: {}",
+        std::env::var("KERBEROS_PRINCIPAL").unwrap_or_else(|_| "NOT SET".to_string())
+    );
+    println!(
+        "  KERBEROS_KEYTAB: {}",
+        std::env::var("KERBEROS_KEYTAB").unwrap_or_else(|_| "NOT SET".to_string())
+    );
     println!();
 
     println!("Manual Test Commands:");

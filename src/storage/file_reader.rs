@@ -63,8 +63,11 @@ pub struct HdfsFileReader {
 
 impl HdfsFileReader {
     pub fn new(config: HdfsConfig) -> Result<Self> {
-        info!("Initializing HDFS client for namenode: {}", config.namenode_url);
-        
+        info!(
+            "Initializing HDFS client for namenode: {}",
+            config.namenode_url
+        );
+
         let client = if let Some(kerberos_config) = &config.kerberos {
             Self::create_kerberos_client(&config.namenode_url, kerberos_config)?
         } else {
@@ -77,8 +80,11 @@ impl HdfsFileReader {
 
     #[allow(dead_code)]
     pub fn new_simple(namenode_url: &str) -> Result<Self> {
-        info!("Initializing simple HDFS client for namenode: {}", namenode_url);
-        
+        info!(
+            "Initializing simple HDFS client for namenode: {}",
+            namenode_url
+        );
+
         let client = hdfs_native::Client::new(namenode_url)?;
         let config = HdfsConfig {
             namenode_url: namenode_url.to_string(),
@@ -90,9 +96,15 @@ impl HdfsFileReader {
         Ok(Self { client, config })
     }
 
-    fn create_kerberos_client(namenode_url: &str, kerberos_config: &KerberosConfig) -> Result<hdfs_native::Client> {
-        info!("Setting up Kerberos authentication for principal: {}", kerberos_config.principal);
-        
+    fn create_kerberos_client(
+        namenode_url: &str,
+        kerberos_config: &KerberosConfig,
+    ) -> Result<hdfs_native::Client> {
+        info!(
+            "Setting up Kerberos authentication for principal: {}",
+            kerberos_config.principal
+        );
+
         // Set Kerberos environment variables if provided
         if let Some(krb5_config_path) = &kerberos_config.krb5_config_path {
             std::env::set_var("KRB5_CONFIG", krb5_config_path);
@@ -124,7 +136,7 @@ impl HdfsFileReader {
 
     pub async fn health_check(&self) -> Result<bool> {
         debug!("Performing HDFS health check");
-        
+
         match self.client.list_status("/", false).await {
             Ok(_) => {
                 debug!("HDFS health check passed");
@@ -142,57 +154,78 @@ impl HdfsFileReader {
 impl FileReader for HdfsFileReader {
     async fn read_file(&self, path: &Path) -> Result<String> {
         use tokio::time::Duration;
-        
+
         let path_str = path.to_string_lossy();
         debug!("Reading HDFS file: {}", path_str);
-        
+
         // Apply timeout to file operations
-        let read_timeout = Duration::from_millis(
-            self.config.read_timeout_ms.unwrap_or(60000)
-        );
-        
+        let read_timeout = Duration::from_millis(self.config.read_timeout_ms.unwrap_or(60000));
+
         let file_result = tokio::time::timeout(read_timeout, async {
-            let mut file = self.client.read(&path_str).await
+            let mut file = self
+                .client
+                .read(&path_str)
+                .await
                 .map_err(|e| anyhow!("Failed to open HDFS file {}: {}", path_str, e))?;
-                
+
             let file_length = file.file_length();
             debug!("HDFS file {} size: {} bytes", path_str, file_length);
-            
-            let bytes = file.read(file_length).await
+
+            let bytes = file
+                .read(file_length)
+                .await
                 .map_err(|e| anyhow!("Failed to read HDFS file {}: {}", path_str, e))?;
-                
+
             String::from_utf8(bytes.to_vec())
                 .map_err(|e| anyhow!("Invalid UTF-8 in HDFS file {}: {}", path_str, e))
-        }).await;
-        
+        })
+        .await;
+
         match file_result {
             Ok(result) => result,
-            Err(_) => Err(anyhow!("Timeout reading HDFS file {}: {} ms", path_str, read_timeout.as_millis())),
+            Err(_) => Err(anyhow!(
+                "Timeout reading HDFS file {}: {} ms",
+                path_str,
+                read_timeout.as_millis()
+            )),
         }
     }
 
     async fn list_directory(&self, path: &Path) -> Result<Vec<String>> {
         let path_str = path.to_string_lossy();
         debug!("Listing HDFS directory: {}", path_str);
-        
-        let entries = self.client.list_status(&path_str, false).await
+
+        let entries = self
+            .client
+            .list_status(&path_str, false)
+            .await
             .map_err(|e| anyhow!("Failed to list HDFS directory {}: {}", path_str, e))?;
-            
-        let file_names: Vec<String> = entries.into_iter()
+
+        let file_names: Vec<String> = entries
+            .into_iter()
             .map(|entry| {
                 // Extract just the file name from the full path
-                entry.path.rsplit('/').next().unwrap_or(&entry.path).to_string()
+                entry
+                    .path
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(&entry.path)
+                    .to_string()
             })
             .collect();
-            
-        debug!("Found {} entries in HDFS directory {}", file_names.len(), path_str);
+
+        debug!(
+            "Found {} entries in HDFS directory {}",
+            file_names.len(),
+            path_str
+        );
         Ok(file_names)
     }
 
     async fn file_exists(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy();
         debug!("Checking HDFS file existence: {}", path_str);
-        
+
         match self.client.get_file_info(&path_str).await {
             Ok(_) => {
                 debug!("HDFS file exists: {}", path_str);
@@ -214,15 +247,18 @@ pub async fn create_file_reader(
     if let Some(hdfs_config) = hdfs_config {
         info!("Creating HDFS file reader for directory: {}", log_directory);
         let reader = HdfsFileReader::new(hdfs_config.clone())?;
-        
+
         // Perform health check
         if let Err(e) = reader.health_check().await {
             warn!("HDFS health check failed, but continuing: {}", e);
         }
-        
+
         Ok(Box::new(reader))
     } else {
-        info!("Creating local file reader for directory: {}", log_directory);
+        info!(
+            "Creating local file reader for directory: {}",
+            log_directory
+        );
         Ok(Box::new(LocalFileReader::new()))
     }
 }

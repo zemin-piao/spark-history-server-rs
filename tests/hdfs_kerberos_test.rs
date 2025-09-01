@@ -18,18 +18,18 @@ struct MockKerberosHdfsFileReader {
 impl FileReader for MockKerberosHdfsFileReader {
     async fn read_file(&self, path: &Path) -> Result<String> {
         let path_str = path.to_string_lossy().to_string();
-        
+
         // Simulate network delay if configured
         if let Some(&delay_ms) = self.simulated_delays.get(&path_str) {
             sleep(Duration::from_millis(delay_ms)).await;
         }
-        
+
         // Simulate Kerberos authentication check
         if self.kerberos_config.is_some() {
             // Simulate authentication delay
             sleep(Duration::from_millis(100)).await;
         }
-        
+
         self.files
             .get(&path_str)
             .cloned()
@@ -38,12 +38,12 @@ impl FileReader for MockKerberosHdfsFileReader {
 
     async fn list_directory(&self, path: &Path) -> Result<Vec<String>> {
         let path_str = path.to_string_lossy().to_string();
-        
+
         // Simulate Kerberos authentication check
         if self.kerberos_config.is_some() {
             sleep(Duration::from_millis(50)).await;
         }
-        
+
         self.directories
             .get(&path_str)
             .cloned()
@@ -89,7 +89,7 @@ impl MockKerberosHdfsFileReader {
             simulated_delays: HashMap::new(),
         }
     }
-    
+
     fn with_delay(mut self, path: &str, delay_ms: u64) -> Self {
         self.simulated_delays.insert(path.to_string(), delay_ms);
         self
@@ -117,11 +117,17 @@ async fn test_kerberos_configuration() -> Result<()> {
     // Verify configuration values
     assert_eq!(hdfs_config.namenode_url, "hdfs://secure-namenode:9000");
     assert!(hdfs_config.kerberos.is_some());
-    
+
     let kerberos = hdfs_config.kerberos.as_ref().unwrap();
     assert_eq!(kerberos.principal, "spark@EXAMPLE.COM");
-    assert_eq!(kerberos.keytab_path.as_ref().unwrap(), "/path/to/spark.keytab");
-    assert_eq!(kerberos.krb5_config_path.as_ref().unwrap(), "/etc/krb5.conf");
+    assert_eq!(
+        kerberos.keytab_path.as_ref().unwrap(),
+        "/path/to/spark.keytab"
+    );
+    assert_eq!(
+        kerberos.krb5_config_path.as_ref().unwrap(),
+        "/etc/krb5.conf"
+    );
     assert_eq!(kerberos.realm.as_ref().unwrap(), "EXAMPLE.COM");
 
     println!("✅ Kerberos configuration test passed");
@@ -218,7 +224,10 @@ async fn test_hdfs_kerberos_error_scenarios() -> Result<()> {
     let non_existent_dir = Path::new("/hdfs/non-existent-directory");
     let result = reader.list_directory(non_existent_dir).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Directory not found"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Directory not found"));
 
     println!("✅ HDFS Kerberos error scenarios test passed");
     Ok(())
@@ -235,7 +244,9 @@ async fn test_hdfs_concurrent_kerberos_access() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let reader = Arc::new(MockKerberosHdfsFileReader::new_with_kerberos(Some(kerberos_config)));
+    let reader = Arc::new(MockKerberosHdfsFileReader::new_with_kerberos(Some(
+        kerberos_config,
+    )));
 
     let mut handles = Vec::new();
     for i in 0..5 {
@@ -277,7 +288,10 @@ async fn test_hdfs_kerberos_environment_variables() -> Result<()> {
 
     assert_eq!(kerberos_config.principal, "env-user@EXAMPLE.COM");
     assert_eq!(kerberos_config.keytab_path.unwrap(), "/env/path/to/keytab");
-    assert_eq!(kerberos_config.krb5_config_path.unwrap(), "/env/path/to/krb5.conf");
+    assert_eq!(
+        kerberos_config.krb5_config_path.unwrap(),
+        "/env/path/to/krb5.conf"
+    );
     assert_eq!(kerberos_config.realm.unwrap(), "ENV.EXAMPLE.COM");
 
     // Clean up environment variables
@@ -297,10 +311,10 @@ async fn test_real_hdfs_kerberos_connection() -> Result<()> {
 
     let namenode_url = std::env::var("HDFS_NAMENODE_URL")
         .unwrap_or_else(|_| "hdfs://secure-namenode:9000".to_string());
-    
-    let principal = std::env::var("KERBEROS_PRINCIPAL")
-        .unwrap_or_else(|_| "spark@EXAMPLE.COM".to_string());
-    
+
+    let principal =
+        std::env::var("KERBEROS_PRINCIPAL").unwrap_or_else(|_| "spark@EXAMPLE.COM".to_string());
+
     let keytab_path = std::env::var("KERBEROS_KEYTAB").ok();
 
     let kerberos_config = KerberosConfig {
@@ -317,7 +331,10 @@ async fn test_real_hdfs_kerberos_connection() -> Result<()> {
         kerberos: Some(kerberos_config),
     };
 
-    println!("Attempting to create HDFS client with Kerberos for: {}", namenode_url);
+    println!(
+        "Attempting to create HDFS client with Kerberos for: {}",
+        namenode_url
+    );
     println!("Using principal: {}", principal);
 
     let hdfs_reader = HdfsFileReader::new(hdfs_config)?;
@@ -334,7 +351,10 @@ async fn test_real_hdfs_kerberos_connection() -> Result<()> {
     // Test directory listing
     match hdfs_reader.list_directory(Path::new("/")).await {
         Ok(entries) => {
-            println!("✅ Root directory listing with Kerberos successful: {} entries", entries.len());
+            println!(
+                "✅ Root directory listing with Kerberos successful: {} entries",
+                entries.len()
+            );
             for entry in entries.iter().take(3) {
                 println!("  - {}", entry);
             }

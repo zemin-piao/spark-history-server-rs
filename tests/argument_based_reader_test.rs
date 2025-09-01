@@ -3,7 +3,7 @@ use tempfile::TempDir;
 use tokio::fs;
 
 use spark_history_server::{
-    config::{HdfsConfig, KerberosConfig, HistoryConfig},
+    config::{HdfsConfig, HistoryConfig, KerberosConfig},
     storage::{file_reader::create_file_reader, HistoryProvider},
 };
 
@@ -44,7 +44,11 @@ async fn test_argument_based_local_reader_selection() -> Result<()> {
 
     // Test file existence check
     assert!(file_reader.file_exists(&event_log_path).await);
-    assert!(!file_reader.file_exists(log_dir.join("non-existent").as_path()).await);
+    assert!(
+        !file_reader
+            .file_exists(log_dir.join("non-existent").as_path())
+            .await
+    );
 
     println!("✅ Argument-based local reader selection test passed");
     Ok(())
@@ -70,7 +74,10 @@ async fn test_argument_based_hdfs_reader_selection() -> Result<()> {
             println!("✅ HDFS reader created successfully (HDFS available)");
         }
         Err(e) => {
-            println!("⚠️ HDFS reader creation failed (expected if no HDFS available): {}", e);
+            println!(
+                "⚠️ HDFS reader creation failed (expected if no HDFS available): {}",
+                e
+            );
             // This is expected in most test environments
         }
     }
@@ -105,7 +112,10 @@ async fn test_argument_based_hdfs_with_kerberos() -> Result<()> {
             println!("✅ HDFS reader with Kerberos created successfully");
         }
         Err(e) => {
-            println!("⚠️ HDFS reader with Kerberos creation failed (expected if no secure HDFS): {}", e);
+            println!(
+                "⚠️ HDFS reader with Kerberos creation failed (expected if no secure HDFS): {}",
+                e
+            );
             // Expected in most test environments without secure HDFS
         }
     }
@@ -148,8 +158,10 @@ async fn test_history_provider_with_local_reader() -> Result<()> {
     let history_provider = HistoryProvider::new(history_config).await?;
 
     // Test application retrieval
-    let applications = history_provider.get_applications(None, None, None, None, None, None).await?;
-    
+    let applications = history_provider
+        .get_applications(None, None, None, None, None, None)
+        .await?;
+
     if !applications.is_empty() {
         let app = &applications[0];
         assert_eq!(app.id, "app-20231120140000-0001");
@@ -167,7 +179,7 @@ async fn test_history_provider_with_hdfs_config() -> Result<()> {
     println!("Testing HistoryProvider with HDFS config...");
 
     let temp_dir = TempDir::new()?;
-    
+
     // Create history config with HDFS
     let hdfs_config = HdfsConfig {
         namenode_url: "hdfs://localhost:9000".to_string(),
@@ -195,7 +207,10 @@ async fn test_history_provider_with_hdfs_config() -> Result<()> {
             println!("✅ HistoryProvider with HDFS reader created successfully");
         }
         Err(e) => {
-            println!("⚠️ HistoryProvider with HDFS failed (expected if no HDFS): {}", e);
+            println!(
+                "⚠️ HistoryProvider with HDFS failed (expected if no HDFS): {}",
+                e
+            );
             // Expected in most test environments
         }
     }
@@ -214,12 +229,16 @@ async fn test_runtime_reader_switching() -> Result<()> {
     // Setup test data
     let app_dir = log_dir.join("app-switch-test");
     fs::create_dir_all(&app_dir).await?;
-    fs::write(app_dir.join("eventLog"), r#"{"Event":"SparkListenerLogStart"}"#).await?;
+    fs::write(
+        app_dir.join("eventLog"),
+        r#"{"Event":"SparkListenerLogStart"}"#,
+    )
+    .await?;
 
     // Test 1: Create with local reader
     println!("Creating local file reader...");
     let local_reader = create_file_reader(&log_dir.to_string_lossy(), None).await?;
-    
+
     let entries = local_reader.list_directory(log_dir.as_path()).await?;
     assert!(entries.contains(&"app-switch-test".to_string()));
 
@@ -233,7 +252,7 @@ async fn test_runtime_reader_switching() -> Result<()> {
     };
 
     let hdfs_reader_result = create_file_reader("/hdfs/spark-events", Some(&hdfs_config)).await;
-    
+
     match hdfs_reader_result {
         Ok(_) => println!("HDFS reader created successfully"),
         Err(_) => println!("HDFS reader creation failed (expected)"),
@@ -242,7 +261,7 @@ async fn test_runtime_reader_switching() -> Result<()> {
     // Test 3: Switch back to local reader
     println!("Switching back to local file reader...");
     let local_reader_2 = create_file_reader(&log_dir.to_string_lossy(), None).await?;
-    
+
     let entries_2 = local_reader_2.list_directory(log_dir.as_path()).await?;
     assert!(entries_2.contains(&"app-switch-test".to_string()));
 

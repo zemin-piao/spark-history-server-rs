@@ -2,10 +2,7 @@ use anyhow::Result;
 use std::{collections::HashMap, path::Path, sync::Arc, time::Duration};
 use tokio::time::sleep;
 
-use spark_history_server::{
-    config::KerberosConfig,
-    storage::file_reader::FileReader,
-};
+use spark_history_server::{config::KerberosConfig, storage::file_reader::FileReader};
 
 /// Advanced Kerberos authentication testing scenarios
 /// These tests simulate various Kerberos authentication states and error conditions
@@ -35,10 +32,11 @@ struct KerberosAwareHdfsReader {
 impl FileReader for KerberosAwareHdfsReader {
     async fn read_file(&self, path: &Path) -> Result<String> {
         let path_str = path.to_string_lossy().to_string();
-        
+
         // Simulate Kerberos authentication process
-        self.simulate_kerberos_auth(&format!("READ: {}", path_str)).await?;
-        
+        self.simulate_kerberos_auth(&format!("READ: {}", path_str))
+            .await?;
+
         self.files
             .get(&path_str)
             .cloned()
@@ -47,10 +45,11 @@ impl FileReader for KerberosAwareHdfsReader {
 
     async fn list_directory(&self, path: &Path) -> Result<Vec<String>> {
         let path_str = path.to_string_lossy().to_string();
-        
+
         // Simulate Kerberos authentication process
-        self.simulate_kerberos_auth(&format!("LIST: {}", path_str)).await?;
-        
+        self.simulate_kerberos_auth(&format!("LIST: {}", path_str))
+            .await?;
+
         self.directories
             .get(&path_str)
             .cloned()
@@ -59,9 +58,13 @@ impl FileReader for KerberosAwareHdfsReader {
 
     async fn file_exists(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_string();
-        
+
         // File existence check usually doesn't require full auth, but log the attempt
-        if (self.simulate_kerberos_auth(&format!("EXISTS: {}", path_str)).await).is_ok() {
+        if (self
+            .simulate_kerberos_auth(&format!("EXISTS: {}", path_str))
+            .await)
+            .is_ok()
+        {
             self.files.contains_key(&path_str)
         } else {
             false
@@ -81,15 +84,26 @@ impl KerberosAwareHdfsReader {
 {"Event":"SparkListenerApplicationEnd","App ID":"app-secure-001","Timestamp":1700520003000}
 "#;
 
-        files.insert("/hdfs/secure-spark-events/app-secure-001/eventLog".to_string(), secure_event_log.to_string());
-        files.insert("/hdfs/secure-spark-events/app-secure-002.inprogress".to_string(), 
-                    secure_event_log.replace("app-secure-001", "app-secure-002"));
+        files.insert(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog".to_string(),
+            secure_event_log.to_string(),
+        );
+        files.insert(
+            "/hdfs/secure-spark-events/app-secure-002.inprogress".to_string(),
+            secure_event_log.replace("app-secure-001", "app-secure-002"),
+        );
 
-        directories.insert("/hdfs/secure-spark-events".to_string(), vec![
-            "app-secure-001".to_string(),
-            "app-secure-002.inprogress".to_string(),
-        ]);
-        directories.insert("/hdfs/secure-spark-events/app-secure-001".to_string(), vec!["eventLog".to_string()]);
+        directories.insert(
+            "/hdfs/secure-spark-events".to_string(),
+            vec![
+                "app-secure-001".to_string(),
+                "app-secure-002.inprogress".to_string(),
+            ],
+        );
+        directories.insert(
+            "/hdfs/secure-spark-events/app-secure-001".to_string(),
+            vec!["eventLog".to_string()],
+        );
 
         Self {
             files,
@@ -137,21 +151,13 @@ impl KerberosAwareHdfsReader {
                     Err(anyhow::anyhow!("No Kerberos configuration provided"))
                 }
             }
-            KerberosAuthState::Expired => {
-                Err(anyhow::anyhow!("Kerberos tickets have expired"))
-            }
-            KerberosAuthState::Invalid => {
-                Err(anyhow::anyhow!("Invalid Kerberos credentials"))
-            }
+            KerberosAuthState::Expired => Err(anyhow::anyhow!("Kerberos tickets have expired")),
+            KerberosAuthState::Invalid => Err(anyhow::anyhow!("Invalid Kerberos credentials")),
             KerberosAuthState::NotConfigured => {
                 Err(anyhow::anyhow!("Kerberos not configured properly"))
             }
-            KerberosAuthState::NetworkError => {
-                Err(anyhow::anyhow!("Network error contacting KDC"))
-            }
-            KerberosAuthState::KdcUnavailable => {
-                Err(anyhow::anyhow!("KDC service unavailable"))
-            }
+            KerberosAuthState::NetworkError => Err(anyhow::anyhow!("Network error contacting KDC")),
+            KerberosAuthState::KdcUnavailable => Err(anyhow::anyhow!("KDC service unavailable")),
         }
     }
 
@@ -171,17 +177,20 @@ async fn test_kerberos_valid_authentication() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::Valid,
-        Some(kerberos_config),
-    );
+    let reader = KerberosAwareHdfsReader::new(KerberosAuthState::Valid, Some(kerberos_config));
 
     // Test successful operations with valid Kerberos
-    let content = reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await?;
+    let content = reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await?;
     assert!(content.contains("SecureSparkApp"));
     assert!(content.contains("kerberos-user@EXAMPLE.COM"));
 
-    let entries = reader.list_directory(Path::new("/hdfs/secure-spark-events")).await?;
+    let entries = reader
+        .list_directory(Path::new("/hdfs/secure-spark-events"))
+        .await?;
     assert_eq!(entries.len(), 2);
 
     // Verify authentication attempts
@@ -204,19 +213,28 @@ async fn test_kerberos_expired_tickets() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::Expired,
-        Some(kerberos_config),
-    );
+    let reader = KerberosAwareHdfsReader::new(KerberosAuthState::Expired, Some(kerberos_config));
 
     // Test operations with expired tickets
-    let result = reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("tickets have expired"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("tickets have expired"));
 
-    let result = reader.list_directory(Path::new("/hdfs/secure-spark-events")).await;
+    let result = reader
+        .list_directory(Path::new("/hdfs/secure-spark-events"))
+        .await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("tickets have expired"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("tickets have expired"));
 
     println!("✅ Expired Kerberos tickets test passed");
     Ok(())
@@ -233,15 +251,19 @@ async fn test_kerberos_invalid_credentials() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::Invalid,
-        Some(kerberos_config),
-    );
+    let reader = KerberosAwareHdfsReader::new(KerberosAuthState::Invalid, Some(kerberos_config));
 
     // Test operations with invalid credentials
-    let result = reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid Kerberos credentials"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid Kerberos credentials"));
 
     println!("✅ Invalid Kerberos credentials test passed");
     Ok(())
@@ -259,12 +281,13 @@ async fn test_kerberos_keytab_vs_ticket_cache() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let keytab_reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::Valid,
-        Some(keytab_config),
-    );
+    let keytab_reader = KerberosAwareHdfsReader::new(KerberosAuthState::Valid, Some(keytab_config));
 
-    let result = keytab_reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = keytab_reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_ok());
     println!("✅ Keytab authentication test passed");
 
@@ -276,12 +299,14 @@ async fn test_kerberos_keytab_vs_ticket_cache() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let ticket_cache_reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::Valid,
-        Some(ticket_cache_config),
-    );
+    let ticket_cache_reader =
+        KerberosAwareHdfsReader::new(KerberosAuthState::Valid, Some(ticket_cache_config));
 
-    let result = ticket_cache_reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = ticket_cache_reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_ok());
     println!("✅ Ticket cache authentication test passed");
 
@@ -299,15 +324,20 @@ async fn test_kerberos_invalid_keytab() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::Valid,
-        Some(kerberos_config),
-    ).with_invalid_keytab();
+    let reader = KerberosAwareHdfsReader::new(KerberosAuthState::Valid, Some(kerberos_config))
+        .with_invalid_keytab();
 
     // Test operations with invalid keytab
-    let result = reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid keytab file"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid keytab file"));
 
     println!("✅ Invalid keytab file test passed");
     Ok(())
@@ -324,15 +354,20 @@ async fn test_kerberos_invalid_ticket_cache() -> Result<()> {
         realm: Some("EXAMPLE.COM".to_string()),
     };
 
-    let reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::Valid,
-        Some(kerberos_config),
-    ).with_invalid_ticket_cache();
+    let reader = KerberosAwareHdfsReader::new(KerberosAuthState::Valid, Some(kerberos_config))
+        .with_invalid_ticket_cache();
 
     // Test operations with invalid ticket cache
-    let result = reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid ticket cache"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid ticket cache"));
 
     println!("✅ Invalid ticket cache test passed");
     Ok(())
@@ -355,20 +390,32 @@ async fn test_kerberos_network_errors() -> Result<()> {
         Some(kerberos_config.clone()),
     );
 
-    let result = network_error_reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = network_error_reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Network error contacting KDC"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Network error contacting KDC"));
     println!("✅ KDC network error test passed");
 
     // Test KDC unavailable
-    let kdc_unavailable_reader = KerberosAwareHdfsReader::new(
-        KerberosAuthState::KdcUnavailable,
-        Some(kerberos_config),
-    );
+    let kdc_unavailable_reader =
+        KerberosAwareHdfsReader::new(KerberosAuthState::KdcUnavailable, Some(kerberos_config));
 
-    let result = kdc_unavailable_reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
+    let result = kdc_unavailable_reader
+        .read_file(Path::new(
+            "/hdfs/secure-spark-events/app-secure-001/eventLog",
+        ))
+        .await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("KDC service unavailable"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("KDC service unavailable"));
     println!("✅ KDC unavailable error test passed");
 
     Ok(())
@@ -481,7 +528,10 @@ async fn test_kerberos_environment_variable_integration() -> Result<()> {
     // Verify environment variables were used
     assert_eq!(env_config.principal, "env-spark@EXAMPLE.COM");
     assert_eq!(env_config.keytab_path.unwrap(), "/env/path/to/spark.keytab");
-    assert_eq!(env_config.krb5_config_path.unwrap(), "/env/path/to/krb5.conf");
+    assert_eq!(
+        env_config.krb5_config_path.unwrap(),
+        "/env/path/to/krb5.conf"
+    );
     assert_eq!(env_config.realm.unwrap(), "ENV.EXAMPLE.COM");
 
     // Clean up environment variables
@@ -507,19 +557,21 @@ async fn test_kerberos_authentication_retry_logic() -> Result<()> {
 
     // Test multiple authentication attempts with different states
     let auth_states = [
-        KerberosAuthState::NetworkError,  // Should fail
-        KerberosAuthState::Expired,       // Should fail  
-        KerberosAuthState::Valid,         // Should succeed
+        KerberosAuthState::NetworkError, // Should fail
+        KerberosAuthState::Expired,      // Should fail
+        KerberosAuthState::Valid,        // Should succeed
     ];
 
     for (i, auth_state) in auth_states.iter().enumerate() {
-        let reader = KerberosAwareHdfsReader::new(
-            auth_state.clone(),
-            Some(kerberos_config.clone()),
-        );
+        let reader =
+            KerberosAwareHdfsReader::new(auth_state.clone(), Some(kerberos_config.clone()));
 
-        let result = reader.read_file(Path::new("/hdfs/secure-spark-events/app-secure-001/eventLog")).await;
-        
+        let result = reader
+            .read_file(Path::new(
+                "/hdfs/secure-spark-events/app-secure-001/eventLog",
+            ))
+            .await;
+
         match auth_state {
             KerberosAuthState::Valid => {
                 assert!(result.is_ok(), "Valid auth should succeed");
@@ -528,9 +580,13 @@ async fn test_kerberos_authentication_retry_logic() -> Result<()> {
                 assert!(result.is_err(), "Invalid auth should fail");
             }
         }
-        
-        println!("Authentication attempt {} with {:?}: {}", 
-                 i + 1, auth_state, if result.is_ok() { "Success" } else { "Failed" });
+
+        println!(
+            "Authentication attempt {} with {:?}: {}",
+            i + 1,
+            auth_state,
+            if result.is_ok() { "Success" } else { "Failed" }
+        );
     }
 
     println!("✅ Kerberos authentication retry logic test passed");

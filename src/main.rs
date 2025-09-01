@@ -11,7 +11,7 @@ mod models;
 mod storage;
 
 use crate::api::create_app;
-use crate::config::{Settings, HdfsConfig, KerberosConfig};
+use crate::config::{HdfsConfig, KerberosConfig, Settings};
 use crate::storage::HistoryProvider;
 
 #[derive(Parser, Debug)]
@@ -109,23 +109,29 @@ async fn main() -> Result<()> {
 
     // Handle HDFS configuration from CLI arguments
     if args.hdfs {
-        let namenode_url = args.hdfs_namenode
+        let namenode_url = args
+            .hdfs_namenode
             .or_else(|| std::env::var("HDFS_NAMENODE_URL").ok())
             .unwrap_or_else(|| "hdfs://localhost:9000".to_string());
 
-        let kerberos_config = if args.kerberos_principal.is_some() 
-            || args.keytab_path.is_some() 
-            || args.krb5_config.is_some() 
-            || args.kerberos_realm.is_some() {
+        let kerberos_config = if args.kerberos_principal.is_some()
+            || args.keytab_path.is_some()
+            || args.krb5_config.is_some()
+            || args.kerberos_realm.is_some()
+        {
             Some(KerberosConfig {
-                principal: args.kerberos_principal
+                principal: args
+                    .kerberos_principal
                     .or_else(|| std::env::var("KERBEROS_PRINCIPAL").ok())
                     .unwrap_or_else(|| "spark@EXAMPLE.COM".to_string()),
-                keytab_path: args.keytab_path
+                keytab_path: args
+                    .keytab_path
                     .or_else(|| std::env::var("KERBEROS_KEYTAB").ok()),
-                krb5_config_path: args.krb5_config
+                krb5_config_path: args
+                    .krb5_config
                     .or_else(|| std::env::var("KRB5_CONFIG").ok()),
-                realm: args.kerberos_realm
+                realm: args
+                    .kerberos_realm
                     .or_else(|| std::env::var("KERBEROS_REALM").ok()),
             })
         } else {

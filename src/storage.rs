@@ -14,7 +14,7 @@ pub mod file_reader;
 pub mod duckdb_store;
 
 use event_log::EventLogParser;
-pub use file_reader::{FileReader, create_file_reader};
+pub use file_reader::{create_file_reader, FileReader};
 // pub use hybrid_store::{ApplicationStore, HybridStore, InMemoryStore, RocksDbStore};  // Temporarily disabled
 pub use duckdb_store::DuckDbStore;
 
@@ -28,9 +28,8 @@ pub struct HistoryProvider {
 
 impl HistoryProvider {
     pub async fn new(config: HistoryConfig) -> Result<Self> {
-        let file_reader: Arc<dyn FileReader> = Arc::from(
-            create_file_reader(&config.log_directory, config.hdfs.as_ref()).await?
-        );
+        let file_reader: Arc<dyn FileReader> =
+            Arc::from(create_file_reader(&config.log_directory, config.hdfs.as_ref()).await?);
         let event_parser = EventLogParser::new();
 
         // Initialize DuckDB store
@@ -154,7 +153,7 @@ impl HistoryProvider {
 
     async fn scan_event_logs_internal(&self) -> Result<()> {
         let log_dir = Path::new(&self.config.log_directory);
-        
+
         // For HDFS, we don't check if directory exists locally
         if self.config.hdfs.is_none() && !log_dir.exists() {
             return Err(anyhow!(
@@ -170,7 +169,10 @@ impl HistoryProvider {
         let entries = match self.file_reader.list_directory(log_dir).await {
             Ok(entries) => entries,
             Err(e) => {
-                warn!("Failed to list directory {}: {}", self.config.log_directory, e);
+                warn!(
+                    "Failed to list directory {}: {}",
+                    self.config.log_directory, e
+                );
                 return Ok(());
             }
         };
@@ -187,7 +189,7 @@ impl HistoryProvider {
                     continue;
                 }
             }
-            
+
             // Try to parse as single event log file
             if entry_name.ends_with(".inprogress") || entry_name.contains("eventLog") {
                 if let Ok(app_info) = self.parse_event_log_file(&entry_path).await {
