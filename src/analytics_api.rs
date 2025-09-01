@@ -16,11 +16,17 @@ pub fn analytics_router() -> Router<HistoryProvider> {
     Router::new()
         .route("/analytics/test", get(test_analytics))
         .route("/analytics/resource-usage", get(get_resource_usage))
-        .route("/analytics/resource-utilization", get(get_resource_utilization_metrics))
+        .route(
+            "/analytics/resource-utilization",
+            get(get_resource_utilization_metrics),
+        )
         .route("/analytics/performance-trends", get(get_performance_trends))
         .route("/analytics/cross-app-summary", get(get_cross_app_summary))
         .route("/analytics/task-distribution", get(get_task_distribution))
-        .route("/analytics/executor-utilization", get(get_executor_utilization))
+        .route(
+            "/analytics/executor-utilization",
+            get(get_executor_utilization),
+        )
 }
 
 /// Test analytics endpoint
@@ -255,4 +261,3 @@ pub struct DataLocalitySummary {
     pub rack_local: i64,
     pub any: i64,
 }
-

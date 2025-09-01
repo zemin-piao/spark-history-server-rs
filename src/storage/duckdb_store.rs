@@ -488,7 +488,7 @@ impl DuckDbStore {
         params: &crate::analytics_api::AnalyticsQuery,
     ) -> anyhow::Result<Vec<crate::analytics_api::PerformanceTrend>> {
         let conn = self.connection.lock().await;
-        
+
         let query = r#"
             SELECT 
                 DATE(timestamp) as date,
@@ -511,26 +511,29 @@ impl DuckDbStore {
 
         let limit = params.limit.unwrap_or(100);
         let mut stmt = conn.prepare(query)?;
-        
-        let rows = stmt.query_map([
-            &params.start_date,
-            &params.start_date,
-            &params.end_date,
-            &params.end_date,
-            &params.app_id,
-            &params.app_id,
-            &Some(limit.to_string())
-        ], |row| {
-            Ok(crate::analytics_api::PerformanceTrend {
-                date: row.get(0)?,
-                app_id: row.get(1)?,
-                avg_task_duration_ms: row.get(2)?,
-                total_tasks: row.get(3)?,
-                failed_tasks: row.get(4)?,
-                avg_input_bytes: row.get(5)?,
-                avg_output_bytes: row.get(6)?,
-            })
-        })?;
+
+        let rows = stmt.query_map(
+            [
+                &params.start_date,
+                &params.start_date,
+                &params.end_date,
+                &params.end_date,
+                &params.app_id,
+                &params.app_id,
+                &Some(limit.to_string()),
+            ],
+            |row| {
+                Ok(crate::analytics_api::PerformanceTrend {
+                    date: row.get(0)?,
+                    app_id: row.get(1)?,
+                    avg_task_duration_ms: row.get(2)?,
+                    total_tasks: row.get(3)?,
+                    failed_tasks: row.get(4)?,
+                    avg_input_bytes: row.get(5)?,
+                    avg_output_bytes: row.get(6)?,
+                })
+            },
+        )?;
 
         let mut trends = Vec::new();
         for row in rows {
@@ -546,7 +549,7 @@ impl DuckDbStore {
         params: &crate::analytics_api::AnalyticsQuery,
     ) -> anyhow::Result<crate::analytics_api::CrossAppSummary> {
         let conn = self.connection.lock().await;
-        
+
         let query = r#"
             WITH app_stats AS (
                 SELECT 
@@ -571,27 +574,30 @@ impl DuckDbStore {
         "#;
 
         let mut stmt = conn.prepare(query)?;
-        let summary = stmt.query_row([
-            &params.start_date, 
-            &params.start_date, 
-            &params.end_date, 
-            &params.end_date
-        ], |row| {
-            Ok(crate::analytics_api::CrossAppSummary {
-                total_applications: row.get(0)?,
-                active_applications: row.get(1)?,
-                total_events: row.get(2)?,
-                total_tasks_completed: row.get(3)?,
-                total_tasks_failed: row.get(4)?,
-                avg_task_duration_ms: row.get(5)?,
-                total_data_processed_gb: row.get(6)?,
-                peak_concurrent_executors: row.get(7)?,
-                date_range: crate::analytics_api::DateRange {
-                    start_date: row.get::<_, String>(8)?,
-                    end_date: row.get::<_, String>(9)?,
-                },
-            })
-        })?;
+        let summary = stmt.query_row(
+            [
+                &params.start_date,
+                &params.start_date,
+                &params.end_date,
+                &params.end_date,
+            ],
+            |row| {
+                Ok(crate::analytics_api::CrossAppSummary {
+                    total_applications: row.get(0)?,
+                    active_applications: row.get(1)?,
+                    total_events: row.get(2)?,
+                    total_tasks_completed: row.get(3)?,
+                    total_tasks_failed: row.get(4)?,
+                    avg_task_duration_ms: row.get(5)?,
+                    total_data_processed_gb: row.get(6)?,
+                    peak_concurrent_executors: row.get(7)?,
+                    date_range: crate::analytics_api::DateRange {
+                        start_date: row.get::<_, String>(8)?,
+                        end_date: row.get::<_, String>(9)?,
+                    },
+                })
+            },
+        )?;
 
         Ok(summary)
     }
@@ -601,8 +607,8 @@ impl DuckDbStore {
         &self,
         params: &crate::analytics_api::AnalyticsQuery,
     ) -> anyhow::Result<Vec<crate::analytics_api::TaskDistribution>> {
-    let conn = self.connection.lock().await;
-        
+        let conn = self.connection.lock().await;
+
         let query = r#"
             SELECT 
                 app_id,
@@ -630,33 +636,36 @@ impl DuckDbStore {
 
         let limit = params.limit.unwrap_or(100);
         let mut stmt = conn.prepare(query)?;
-        
-        let rows = stmt.query_map([
-            &params.start_date,
-            &params.start_date,
-            &params.end_date,
-            &params.end_date,
-            &params.app_id,
-            &params.app_id,
-            &Some(limit.to_string())
-        ], |row| {
-            Ok(crate::analytics_api::TaskDistribution {
-                app_id: row.get(0)?,
-                stage_id: row.get(1)?,
-                total_tasks: row.get(2)?,
-                completed_tasks: row.get(3)?,
-                failed_tasks: row.get(4)?,
-                avg_duration_ms: row.get(5)?,
-                min_duration_ms: row.get(6)?,
-                max_duration_ms: row.get(7)?,
-                data_locality_summary: crate::analytics_api::DataLocalitySummary {
-                    process_local: row.get(8)?,
-                    node_local: row.get(9)?,
-                    rack_local: row.get(10)?,
-                    any: row.get(11)?,
-                },
-            })
-        })?;
+
+        let rows = stmt.query_map(
+            [
+                &params.start_date,
+                &params.start_date,
+                &params.end_date,
+                &params.end_date,
+                &params.app_id,
+                &params.app_id,
+                &Some(limit.to_string()),
+            ],
+            |row| {
+                Ok(crate::analytics_api::TaskDistribution {
+                    app_id: row.get(0)?,
+                    stage_id: row.get(1)?,
+                    total_tasks: row.get(2)?,
+                    completed_tasks: row.get(3)?,
+                    failed_tasks: row.get(4)?,
+                    avg_duration_ms: row.get(5)?,
+                    min_duration_ms: row.get(6)?,
+                    max_duration_ms: row.get(7)?,
+                    data_locality_summary: crate::analytics_api::DataLocalitySummary {
+                        process_local: row.get(8)?,
+                        node_local: row.get(9)?,
+                        rack_local: row.get(10)?,
+                        any: row.get(11)?,
+                    },
+                })
+            },
+        )?;
 
         let mut distribution = Vec::new();
         for row in rows {
@@ -672,7 +681,7 @@ impl DuckDbStore {
         params: &crate::analytics_api::AnalyticsQuery,
     ) -> anyhow::Result<Vec<crate::analytics_api::ExecutorUtilization>> {
         let conn = self.connection.lock().await;
-        
+
         let query = r#"
             WITH executor_stats AS (
                 SELECT 
@@ -709,29 +718,31 @@ impl DuckDbStore {
 
         let limit = params.limit.unwrap_or(50);
         let mut stmt = conn.prepare(query)?;
-        
-        let rows = stmt.query_map([
-            &params.start_date,
-            &params.start_date,
-            &params.end_date,
-            &params.end_date,
-            &Some(limit.to_string())
-        ], |row| {
-            let apps_json: String = row.get(7)?;
-            let apps_served: Vec<String> = serde_json::from_str(&apps_json)
-                .unwrap_or_default();
-            
-            Ok(crate::analytics_api::ExecutorUtilization {
-                executor_id: row.get(0)?,
-                host: row.get(1)?,
-                total_tasks: row.get(2)?,
-                total_duration_ms: row.get(3)?,
-                avg_cpu_utilization: row.get(4)?,
-                peak_memory_usage_mb: row.get(5)?,
-                data_locality_hits: row.get(6)?,
-                apps_served,
-            })
-        })?;
+
+        let rows = stmt.query_map(
+            [
+                &params.start_date,
+                &params.start_date,
+                &params.end_date,
+                &params.end_date,
+                &Some(limit.to_string()),
+            ],
+            |row| {
+                let apps_json: String = row.get(7)?;
+                let apps_served: Vec<String> = serde_json::from_str(&apps_json).unwrap_or_default();
+
+                Ok(crate::analytics_api::ExecutorUtilization {
+                    executor_id: row.get(0)?,
+                    host: row.get(1)?,
+                    total_tasks: row.get(2)?,
+                    total_duration_ms: row.get(3)?,
+                    avg_cpu_utilization: row.get(4)?,
+                    peak_memory_usage_mb: row.get(5)?,
+                    data_locality_hits: row.get(6)?,
+                    apps_served,
+                })
+            },
+        )?;
 
         let mut utilization = Vec::new();
         for row in rows {
@@ -747,7 +758,7 @@ impl DuckDbStore {
         params: &crate::analytics_api::AnalyticsQuery,
     ) -> anyhow::Result<Vec<crate::analytics_api::ResourceUtilizationMetrics>> {
         let conn = self.connection.lock().await;
-        
+
         let query = r#"
             SELECT 
                 app_id,
@@ -786,7 +797,7 @@ impl DuckDbStore {
 
         let limit = params.limit.unwrap_or(100);
         let mut stmt = conn.prepare(query)?;
-        
+
         let rows = stmt.query_map([&Some(limit.to_string())], |row| {
             Ok(crate::analytics_api::ResourceUtilizationMetrics {
                 executor_id: row.get(0)?,

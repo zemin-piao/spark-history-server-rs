@@ -3,17 +3,14 @@ use serde_json::Value;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use spark_history_server::{
-    api::create_app,
-    storage::HistoryProvider,
-};
+use spark_history_server::{api::create_app, storage::HistoryProvider};
 mod test_config;
 use test_config::create_test_config;
 
 /// Setup test environment with sample data
 async fn setup_test_environment() -> Result<(HistoryProvider, tempfile::TempDir)> {
     let (mut config, temp_dir) = create_test_config();
-    
+
     // Create a test event log directory
     let test_events_dir = temp_dir.path().join("spark-events");
     std::fs::create_dir_all(&test_events_dir)?;
@@ -48,7 +45,7 @@ async fn setup_test_environment() -> Result<(HistoryProvider, tempfile::TempDir)
 #[tokio::test]
 async fn test_analytics_endpoints() -> Result<()> {
     let (history_provider, _temp_dir) = setup_test_environment().await?;
-    
+
     // Create the app
     let app = create_app(history_provider).await?;
 
@@ -68,7 +65,10 @@ async fn test_analytics_endpoints() -> Result<()> {
 
     // Test 1: Analytics test endpoint
     println!("Testing analytics test endpoint...");
-    let response = client.get(format!("{}/api/v1/analytics/test", base_url)).send().await?;
+    let response = client
+        .get(format!("{}/api/v1/analytics/test", base_url))
+        .send()
+        .await?;
     assert_eq!(response.status(), 200);
     let json: Value = response.json().await?;
     assert_eq!(json["status"], "analytics working");
@@ -76,7 +76,10 @@ async fn test_analytics_endpoints() -> Result<()> {
 
     // Test 2: Resource usage endpoint
     println!("Testing resource usage endpoint...");
-    let response = client.get(format!("{}/api/v1/analytics/resource-usage", base_url)).send().await?;
+    let response = client
+        .get(format!("{}/api/v1/analytics/resource-usage", base_url))
+        .send()
+        .await?;
     assert_eq!(response.status(), 200);
     let json: Value = response.json().await?;
     assert!(json.is_array());
@@ -84,7 +87,13 @@ async fn test_analytics_endpoints() -> Result<()> {
 
     // Test 3: Resource utilization endpoint
     println!("Testing resource utilization endpoint...");
-    let response = client.get(format!("{}/api/v1/analytics/resource-utilization", base_url)).send().await?;
+    let response = client
+        .get(format!(
+            "{}/api/v1/analytics/resource-utilization",
+            base_url
+        ))
+        .send()
+        .await?;
     assert_eq!(response.status(), 200);
     let json: Value = response.json().await?;
     assert!(json.is_array());
@@ -107,7 +116,13 @@ async fn test_analytics_endpoints() -> Result<()> {
 
     // Test 9: Executor summary endpoint (part of existing API but related to analytics)
     println!("Testing executor summary endpoint...");
-    let response = client.get(format!("{}/api/v1/applications/test-app-1/executors", base_url)).send().await?;
+    let response = client
+        .get(format!(
+            "{}/api/v1/applications/test-app-1/executors",
+            base_url
+        ))
+        .send()
+        .await?;
     assert_eq!(response.status(), 200);
     let json: Value = response.json().await?;
     assert!(json.is_array());
