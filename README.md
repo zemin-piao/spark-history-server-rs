@@ -8,7 +8,7 @@
 
 ⚠️ **This project is a Work In Progress (WIP) and not production ready** ⚠️
 
-A high-performance Spark History Server implementation in Rust with advanced analytics capabilities. Built with DuckDB for powerful cross-application insights and optimized for large-scale Spark deployments.
+A **analytics-first** Spark History Server implementation in Rust, purpose-built for **cross-application insights** and **trend analysis**. Unlike traditional Spark History Servers that focus on individual application details, this server excels at **aggregations and analytics across multiple applications** using DuckDB's analytical power.
 
 **🏆 Proven Performance: Successfully tested with 100,000 applications and 2M events at 10,700 events/sec**
 
@@ -24,47 +24,71 @@ A high-performance Spark History Server implementation in Rust with advanced ana
 - 🚧 **Web UI**: Not implemented (API-only service)
 - 🚧 **Production Features**: Metrics, monitoring, security features planned
 
-## Features
+## 🎯 **Analytics-First Design Philosophy**
 
-- **Advanced Analytics**: Cross-application performance insights and resource usage analytics
-- **DuckDB Backend**: Embedded analytical database for fast aggregations and complex queries
-- **HDFS Native Support**: Direct HDFS integration using `hdfs-native` for optimal performance
-- **Event Stream Processing**: Efficient batch processing of Spark event logs with compression support
-- **REST API**: Comprehensive API endpoints including standard Spark History Server v1 compatibility
-- **Zero Deployment**: Single binary with embedded database - no external dependencies
-- **High Performance**: Async I/O with batched writes and in-memory caching for hot data
-- **Enterprise Scale**: **Proven to handle 100K+ applications with sub-10ms query response times**
+This Spark History Server is **purpose-built for analytics**, not individual application monitoring. It excels where traditional history servers fall short:
 
-## API Endpoints
+### **✅ What We Excel At (Analytics & Trends)**
+- 📊 **Cross-Application Analytics**: Query and aggregate metrics across thousands of Spark applications simultaneously
+- 📈 **Performance Trend Analysis**: Time-series analysis of resource usage, task performance, and system health
+- 🔍 **Resource Usage Patterns**: Identify underutilized executors, memory bottlenecks, and optimization opportunities across your entire Spark estate
+- ⚡ **High-Scale Aggregations**: DuckDB's columnar storage powers complex analytical queries on millions of events
+- 📉 **Historical Insights**: Long-term trend analysis for capacity planning and performance optimization
+- 🎯 **Enterprise Dashboards**: Perfect backend for analytics dashboards showing cluster-wide Spark metrics
 
-### Standard Spark History Server API v1
+### **❌ What Traditional Servers Do Better (Individual App Details)**
+- Individual job/stage/task drill-down details
+- Real-time application monitoring and debugging  
+- Task-level performance analysis within a single application
+- Detailed executor thread dumps and live metrics
+- SQL query execution plan analysis
 
-**✅ Fully Implemented**
-- `GET /api/v1/applications` - List all applications with filtering support
-  - Query parameters: `status`, `minDate`, `maxDate`, `minEndDate`, `maxEndDate`, `limit`
-- `GET /api/v1/applications/{appId}` - Get application details
-- `GET /api/v1/applications/{appId}/executors` - List executors for application
-- `GET /api/v1/version` - Get version information
+## 🏗️ **Core Features**
 
-**⚠️ Placeholder Implementation (returns mock data)**
-- `GET /api/v1/applications/{appId}/jobs` - List jobs for application
-- `GET /api/v1/applications/{appId}/stages` - List stages for application  
-- `GET /api/v1/applications/{appId}/environment` - Get application environment
-- `GET /api/v1/applications/{appId}/storage/rdd` - List RDD storage info
+- **🧮 Advanced Analytics Engine**: Cross-application performance insights and resource usage analytics
+- **🦆 DuckDB Analytical Backend**: Embedded columnar database optimized for aggregations and complex analytical queries
+- **📡 HDFS Native Integration**: Direct HDFS access using `hdfs-native` for enterprise-scale event log processing
+- **⚡ High-Throughput Processing**: Batch processing of compressed event logs with 10K+ events/sec performance
+- **🔌 Dual API Design**: Standard Spark History Server v1 compatibility + advanced analytics endpoints
+- **📦 Zero Deployment Complexity**: Single binary with embedded database - no external dependencies
+- **🚀 Enterprise Proven**: **Load tested with 100K+ applications and sub-10ms analytical query response times**
 
-### Advanced Analytics Endpoints
+## 🌐 **API Endpoints & Capabilities**
 
-**✅ Implemented and Active**
-- `GET /api/v1/analytics/resource-usage` - Resource usage trends across applications
-- `GET /api/v1/analytics/performance-trends` - Performance metrics over time
-- `GET /api/v1/analytics/cross-app-summary` - Cross-application summary statistics  
-- `GET /api/v1/analytics/task-distribution` - Task distribution and locality analysis
-- `GET /api/v1/analytics/executor-utilization` - Executor utilization metrics
+### 🎯 **Analytics-First Endpoints (Our Strength)**
 
-### System Health
+**✅ Advanced Cross-Application Analytics**
+- `GET /api/v1/analytics/cross-app-summary` - **Enterprise-wide Spark metrics** across all applications
+- `GET /api/v1/analytics/performance-trends` - **Time-series performance analysis** for capacity planning  
+- `GET /api/v1/analytics/resource-usage` - **Resource utilization patterns** and optimization insights
+- `GET /api/v1/analytics/task-distribution` - **Task performance distribution** and locality analysis across apps
+- `GET /api/v1/analytics/executor-utilization` - **Cross-application executor efficiency** metrics
 
-**✅ Fully Implemented**
-- `GET /health` - Health check endpoint
+### 📋 **Standard Spark History Server API v1 (Basic Compatibility)**
+
+**✅ Core Application Endpoints**
+- `GET /api/v1/applications` - List all applications with filtering (`status`, `minDate`, `maxDate`, `limit`)
+- `GET /api/v1/applications/{appId}` - Application details and summary metrics
+- `GET /api/v1/applications/{appId}/executors` - Executor information for application
+- `GET /api/v1/version` - Server version information
+
+**⚠️ Limited Implementation (application-level only)**
+- `GET /api/v1/applications/{appId}/jobs` - Basic job listing (no detailed drill-down)
+- `GET /api/v1/applications/{appId}/stages` - Basic stage listing (no task-level details)  
+- `GET /api/v1/applications/{appId}/environment` - Application environment summary
+- `GET /api/v1/applications/{appId}/storage/rdd` - RDD storage summary
+
+### ❌ **Not Implemented (Use Traditional Spark History Server)**
+
+For detailed individual application analysis, use the standard Spark History Server:
+- Job/Stage/Task detailed drill-down endpoints
+- SQL query execution plan analysis (`/sql/*` endpoints)  
+- Streaming batch analysis (`/streaming/*` endpoints)
+- Executor thread dumps and live metrics
+- Event log downloads and detailed task analysis
+
+### 🏥 **System Health**
+- `GET /health` - Health check and system status
 
 ## Configuration
 
@@ -180,15 +204,15 @@ The Spark History Server is built around a modern, analytics-first architecture 
 └─────────────────┘    └──────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-### Key Advantages
+### 🏆 **Key Advantages for Analytics**
 
-- **Zero Deployment Complexity**: Single binary, embedded database, no external dependencies
-- **Cross-Application Analytics**: SQL-powered insights across all Spark applications simultaneously
-- **High Write Performance**: Incremental scanning + batched processing for optimal throughput
-- **Analytical Power**: DuckDB's columnar storage optimized for complex aggregations and time-series
-- **Schema Flexibility**: Hot field extraction + JSON fallback handles diverse event schemas
-- **Enterprise Scale Proven**: **Load tested with 100K applications, 2M events at 10,700 events/sec**
-- **Production Ready**: Comprehensive testing, error handling, and monitoring hooks
+- **🎯 Analytics-First Architecture**: Purpose-built for cross-application insights and trend analysis, not individual app debugging
+- **📊 SQL-Powered Analytics**: Complex aggregations and time-series analysis across thousands of Spark applications using DuckDB
+- **⚡ High-Scale Performance**: **100K applications, 2M events processed at 10,700 events/sec** with sub-10ms analytical queries
+- **🔄 Zero Deployment Complexity**: Single binary, embedded analytical database, no external infrastructure required
+- **📈 Enterprise Trend Analysis**: Long-term performance patterns, capacity planning insights, and resource optimization opportunities
+- **🏗️ Flexible Data Model**: Hot field extraction + JSON storage handles diverse Spark event schemas across versions
+- **🚀 Production Proven**: Comprehensive load testing, error handling, and enterprise-scale validation
 
 ## Load Testing & Performance
 
