@@ -4,7 +4,7 @@
 [![Apache Spark](https://img.shields.io/badge/Apache%20Spark-FDEE21?style=for-the-badge&logo=apachespark&logoColor=black)](https://spark.apache.org/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/zemin-piao/spark-history-server-rs/ci.yml?branch=main&style=flat-square)](https://img.shields.io/github/actions/workflow/status/zemin-piao/spark-history-server-rs/ci.yml?branch=main)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/zemin-piao/spark-history-server-rs/rust.yml?branch=main&style=flat-square)](https://github.com/zemin-piao/spark-history-server-rs/actions/workflows/rust.yml)
 
 ⚠️ **This project is a Work In Progress (WIP) and not production ready** ⚠️
 
