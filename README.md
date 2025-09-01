@@ -160,9 +160,13 @@ The Spark History Server is built around a modern, analytics-first architecture 
 ### Data Flow
 
 ```
-HDFS Event Logs → Stream Processing → Batch Processing → DuckDB Storage
-                                                              ↓
-                                    REST API ← In-Memory Cache ← 
+┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   HDFS/Storage  │ -> │  Event Processor │ -> │   DuckDB Store   │ -> │   API Server    │
+│                 │    │                  │    │                  │    │                 │
+│ • Event Logs    │    │ • Incremental    │    │ • Events Table   │    │ • REST API      │
+│ • .lz4/.snappy  │    │   Scanning       │    │ • JSON + Hot     │    │ • Analytics     │
+│ • .inprogress   │    │ • Batch Writing  │    │   Fields         │    │ • Cross-App     │
+└─────────────────┘    └──────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
 ### Key Advantages
