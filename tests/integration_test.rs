@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde_json::Value;
 use std::time::Duration;
 use tokio::time::sleep;
+use tracing::info;
 
 use spark_history_server::{
     api::create_app,
@@ -11,8 +12,19 @@ use spark_history_server::{
 mod test_config;
 use test_config::create_test_config;
 
+// Initialize test logging
+fn init_test_tracing() {
+    use tracing_subscriber::{fmt, EnvFilter};
+    let _ = fmt()
+        .with_test_writer()
+        .with_env_filter(EnvFilter::from_default_env().add_directive("debug".parse().unwrap()))
+        .try_init();
+}
+
 #[tokio::test]
 async fn test_integration_full_workflow() -> Result<()> {
+    init_test_tracing();
+
     // Setup test configuration
     let (config, _) = create_test_config();
 
@@ -37,16 +49,16 @@ async fn test_integration_full_workflow() -> Result<()> {
     let client = reqwest::Client::new();
 
     // Test 1: Health check
-    println!("Testing health check endpoint...");
+    info!("Testing health check endpoint...");
     let response = client.get(format!("{}/health", base_url)).send().await?;
 
     assert_eq!(response.status(), 200);
     let health: Value = response.json().await?;
     assert_eq!(health["status"], "healthy");
-    println!("✅ Health check passed");
+    info!("✅ Health check passed");
 
     // Test 2: Version endpoint
-    println!("Testing version endpoint...");
+    info!("Testing version endpoint...");
     let response = client
         .get(format!("{}/api/v1/version", base_url))
         .send()
@@ -55,10 +67,10 @@ async fn test_integration_full_workflow() -> Result<()> {
     assert_eq!(response.status(), 200);
     let version: VersionInfo = response.json().await?;
     assert!(!version.version.is_empty());
-    println!("✅ Version endpoint passed: {}", version.version);
+    info!("✅ Version endpoint passed: {}", version.version);
 
     // Test 3: Applications list endpoint
-    println!("Testing applications list endpoint...");
+    info!("Testing applications list endpoint...");
     let response = client
         .get(format!("{}/api/v1/applications", base_url))
         .send()
@@ -66,7 +78,7 @@ async fn test_integration_full_workflow() -> Result<()> {
 
     assert_eq!(response.status(), 200);
     let apps: Vec<ApplicationInfo> = response.json().await?;
-    println!(
+    info!(
         "✅ Applications endpoint passed, found {} applications",
         apps.len()
     );
@@ -74,7 +86,7 @@ async fn test_integration_full_workflow() -> Result<()> {
     // If we have applications, test individual app endpoint
     if !apps.is_empty() {
         let first_app = &apps[0];
-        println!(
+        info!(
             "Testing individual application endpoint for app: {}",
             first_app.id
         );
@@ -87,11 +99,11 @@ async fn test_integration_full_workflow() -> Result<()> {
         assert_eq!(response.status(), 200);
         let app: ApplicationInfo = response.json().await?;
         assert_eq!(app.id, first_app.id);
-        println!("✅ Individual application endpoint passed");
+        info!("✅ Individual application endpoint passed");
     }
 
     // Test 4: Applications with query parameters
-    println!("Testing applications endpoint with query parameters...");
+    info!("Testing applications endpoint with query parameters...");
     let response = client
         .get(format!(
             "{}/api/v1/applications?limit=5&status=COMPLETED",
@@ -103,25 +115,25 @@ async fn test_integration_full_workflow() -> Result<()> {
     assert_eq!(response.status(), 200);
     let filtered_apps: Vec<ApplicationInfo> = response.json().await?;
     assert!(filtered_apps.len() <= 5);
-    println!(
+    info!(
         "✅ Applications with filters passed, returned {} applications",
         filtered_apps.len()
     );
 
     // Test 5: Non-existent application
-    println!("Testing non-existent application endpoint...");
+    info!("Testing non-existent application endpoint...");
     let response = client
         .get(format!("{}/api/v1/applications/non-existent-app", base_url))
         .send()
         .await?;
 
     assert_eq!(response.status(), 404);
-    println!("✅ Non-existent application returns 404 as expected");
+    info!("✅ Non-existent application returns 404 as expected");
 
     // Test 6: Jobs endpoint (should return empty array for now)
     if !apps.is_empty() {
         let first_app = &apps[0];
-        println!("Testing jobs endpoint for app: {}", first_app.id);
+        info!("Testing jobs endpoint for app: {}", first_app.id);
 
         let response = client
             .get(format!(
@@ -133,18 +145,19 @@ async fn test_integration_full_workflow() -> Result<()> {
 
         assert_eq!(response.status(), 200);
         let jobs: Vec<Value> = response.json().await?;
-        println!("✅ Jobs endpoint passed, returned {} jobs", jobs.len());
+        info!("✅ Jobs endpoint passed, returned {} jobs", jobs.len());
     }
 
     // Clean up: abort the server
     server_handle.abort();
 
-    println!("\n🎉 All integration tests passed!");
+    info!("\n🎉 All integration tests passed!");
     Ok(())
 }
 
 #[tokio::test]
 async fn test_date_filtering() -> Result<()> {
+    init_test_tracing();
     let (config, _) = create_test_config();
 
     let history_provider = HistoryProvider::new(config).await?;
@@ -161,7 +174,7 @@ async fn test_date_filtering() -> Result<()> {
     let client = reqwest::Client::new();
 
     // Test date range filtering
-    println!("Testing date range filtering...");
+    info!("Testing date range filtering...");
     let response = client
         .get(format!(
             "{}/api/v1/applications?minDate=2023-01-01&maxDate=2024-01-01",
@@ -172,7 +185,7 @@ async fn test_date_filtering() -> Result<()> {
 
     assert_eq!(response.status(), 200);
     let apps: Vec<ApplicationInfo> = response.json().await?;
-    println!(
+    info!(
         "✅ Date filtering passed, returned {} applications",
         apps.len()
     );
@@ -183,6 +196,7 @@ async fn test_date_filtering() -> Result<()> {
 
 #[tokio::test]
 async fn test_cors_headers() -> Result<()> {
+    init_test_tracing();
     let (config, _) = create_test_config();
 
     let history_provider = HistoryProvider::new(config).await?;
@@ -199,7 +213,7 @@ async fn test_cors_headers() -> Result<()> {
     let client = reqwest::Client::new();
 
     // Test CORS preflight request
-    println!("Testing CORS headers...");
+    info!("Testing CORS headers...");
     let response = client
         .request(
             reqwest::Method::OPTIONS,
@@ -212,7 +226,7 @@ async fn test_cors_headers() -> Result<()> {
 
     // Should have CORS headers
     assert!(response.status().is_success() || response.status() == 404); // Either works with CORS
-    println!("✅ CORS test passed");
+    info!("✅ CORS test passed");
 
     server_handle.abort();
     Ok(())
