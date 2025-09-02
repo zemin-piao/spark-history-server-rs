@@ -73,6 +73,16 @@ struct OptimizeTemplate {
     task_distribution: Vec<DisplayTaskDistribution>,
 }
 
+#[derive(Template)]
+#[template(path = "resources_view.html")]
+struct ResourcesTemplate {
+    resource_summary: ResourceSummary,
+    resource_utilization: Vec<DisplayResourceUtilizationMetrics>,
+    resource_apps: Vec<String>,
+    resource_hosts: Vec<String>,
+    executor_count: usize,
+}
+
 #[derive(Clone)]
 pub struct DisplayPerformanceTrend {
     pub date: String,
@@ -109,6 +119,18 @@ impl From<PerformanceTrend> for DisplayPerformanceTrend {
 }
 
 #[derive(Clone)]
+pub struct ResourceSummary {
+    pub total_executors: i64,
+    pub unique_hosts: i64,
+    pub total_memory_gb: i64,
+    pub memory_utilization_percent: f64,
+    pub total_cpu_cores: i64,
+    pub cpu_utilization_percent: f64,
+    pub total_spill_gb: f64,
+    pub spill_applications: i64,
+}
+
+#[derive(Clone)]
 pub struct DisplayResourceUtilizationMetrics {
     pub executor_id: String,
     pub host: String,
@@ -116,28 +138,66 @@ pub struct DisplayResourceUtilizationMetrics {
     pub app_id: String,
     pub app_name: String,
     pub total_tasks: i64,
+    pub completed_tasks: i64,
+    pub failed_tasks: i64,
     pub total_duration_ms: i64,
+    pub avg_task_duration_ms: String,
+    pub cpu_time_ms: i64,
     pub peak_memory_usage_mb: String,
-    #[allow(dead_code)]
     pub max_memory_mb: i64,
+    pub memory_utilization_percent: String,
     pub input_bytes: i64,
+    pub output_bytes: i64,
+    pub shuffle_read_bytes: i64,
+    pub shuffle_write_bytes: i64,
+    pub disk_spill_bytes: i64,
+    pub memory_spill_bytes: i64,
+    pub data_locality_process_local: i64,
+    pub data_locality_node_local: i64,
+    pub data_locality_rack_local: i64,
+    pub data_locality_any: i64,
+    pub is_active: bool,
 }
 
 impl From<ResourceUtilizationMetrics> for DisplayResourceUtilizationMetrics {
     fn from(metrics: ResourceUtilizationMetrics) -> Self {
+        let memory_utilization = if metrics.max_memory_mb > 0 {
+            metrics.peak_memory_usage_mb.unwrap_or(0) as f64 / metrics.max_memory_mb as f64 * 100.0
+        } else {
+            0.0
+        };
+
         Self {
             executor_id: metrics.executor_id,
             host: metrics.host,
             app_id: metrics.app_id,
             app_name: metrics.app_name,
             total_tasks: metrics.total_tasks,
+            completed_tasks: metrics.completed_tasks,
+            failed_tasks: metrics.failed_tasks,
             total_duration_ms: metrics.total_duration_ms,
+            avg_task_duration_ms: metrics
+                .avg_task_duration_ms
+                .map(|v| format!("{:.1}", v))
+                .unwrap_or_else(|| "-".to_string()),
+            cpu_time_ms: metrics.cpu_time_ms,
             peak_memory_usage_mb: metrics
                 .peak_memory_usage_mb
                 .map(|v| v.to_string())
-                .unwrap_or_else(|| metrics.max_memory_mb.to_string()),
+                .unwrap_or_else(|| "0".to_string()),
             max_memory_mb: metrics.max_memory_mb,
-            input_bytes: metrics.input_bytes,
+            memory_utilization_percent: format!("{:.1}", memory_utilization),
+            input_bytes: metrics.input_bytes / 1048576, // Convert to MB
+            output_bytes: metrics.output_bytes / 1048576, // Convert to MB
+            shuffle_read_bytes: metrics.shuffle_read_bytes / 1048576, // Convert to MB
+            shuffle_write_bytes: metrics.shuffle_write_bytes / 1048576, // Convert to MB
+            disk_spill_bytes: metrics.disk_spill_bytes / 1048576, // Convert to MB
+            memory_spill_bytes: metrics.memory_spill_bytes / 1048576, // Convert to MB
+            data_locality_process_local: metrics.data_locality_process_local,
+            data_locality_node_local: metrics.data_locality_node_local,
+            data_locality_rack_local: metrics.data_locality_rack_local,
+            data_locality_any: metrics.data_locality_any,
+            is_active: metrics.is_active,
         }
     }
 }
@@ -199,7 +259,8 @@ pub struct ApplicationSummary {
 
 pub fn dashboard_router() -> Router<HistoryProvider> {
     Router::new()
-        .route("/", get(cluster_overview))
+        .route("/", get(analytics_dashboard))
+        .route("/cluster", get(cluster_overview))
         .route("/analytics", get(analytics_dashboard))
         .route("/resources", get(resources_view))
         .route("/optimize", get(optimize_view))
@@ -295,19 +356,55 @@ pub async fn analytics_dashboard(
 
 pub async fn resources_view(
     Query(_params): Query<DashboardQuery>,
-    State(_provider): State<HistoryProvider>,
+    State(provider): State<HistoryProvider>,
 ) -> Result<Html<String>, StatusCode> {
-    // TODO: Implement resources view
-    let html = r#"
-    <html>
-    <body>
-        <h1>Resources View</h1>
-        <p>Coming soon - detailed resource utilization analysis</p>
-        <a href="/">← Back to Cluster Overview</a>
-    </body>
-    </html>
-    "#;
-    Ok(Html(html.to_string()))
+    let analytics_query = crate::analytics_api::AnalyticsQuery {
+        start_date: None,
+        end_date: None,
+        limit: Some(50), // Get more data for resources view
+        app_id: None,
+    };
+
+    // Fetch resource utilization data
+    let resource_utilization = get_resource_utilization(&provider, &analytics_query).await?;
+
+    // Create resource summary from the data
+    let resource_summary = create_resource_summary(&resource_utilization);
+
+    // Extract unique apps and hosts for filters
+    let resource_apps = resource_utilization
+        .iter()
+        .map(|r| r.app_name.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    let resource_hosts = resource_utilization
+        .iter()
+        .map(|r| r.host.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    let display_resource_utilization: Vec<DisplayResourceUtilizationMetrics> =
+        resource_utilization.into_iter().map(|r| r.into()).collect();
+    let executor_count = display_resource_utilization.len();
+
+    let template = ResourcesTemplate {
+        resource_summary,
+        resource_utilization: display_resource_utilization,
+        resource_apps,
+        resource_hosts,
+        executor_count,
+    };
+
+    match template.render() {
+        Ok(html) => Ok(Html(html)),
+        Err(e) => {
+            tracing::error!("Template render error: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 pub async fn teams_view(
@@ -500,6 +597,75 @@ async fn get_recent_applications(
             tracing::error!("Failed to get recent applications: {}", e);
             Ok(vec![]) // Return empty list instead of error to keep UI working
         }
+    }
+}
+
+// Helper function to create resource summary
+fn create_resource_summary(resource_utilization: &[ResourceUtilizationMetrics]) -> ResourceSummary {
+    let total_executors = resource_utilization.len() as i64;
+    let unique_hosts = resource_utilization
+        .iter()
+        .map(|r| &r.host)
+        .collect::<std::collections::HashSet<_>>()
+        .len() as i64;
+
+    let total_memory_mb: i64 = resource_utilization.iter().map(|r| r.max_memory_mb).sum();
+    let total_memory_gb = total_memory_mb / 1024;
+
+    let peak_memory_mb: i64 = resource_utilization
+        .iter()
+        .map(|r| r.peak_memory_usage_mb.unwrap_or(0))
+        .sum();
+
+    let memory_utilization_percent = if total_memory_mb > 0 {
+        (peak_memory_mb as f64 / total_memory_mb as f64 * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+
+    // Estimate CPU cores (assuming 1 core per executor)
+    let total_cpu_cores = total_executors;
+
+    // Estimate CPU utilization based on task runtime vs wall clock time
+    let total_cpu_time: i64 = resource_utilization.iter().map(|r| r.cpu_time_ms).sum();
+    let total_runtime: i64 = resource_utilization
+        .iter()
+        .map(|r| r.total_duration_ms)
+        .sum();
+
+    let cpu_utilization_percent = if total_runtime > 0 {
+        (total_cpu_time as f64 / total_runtime as f64 * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+
+    let total_disk_spill: i64 = resource_utilization
+        .iter()
+        .map(|r| r.disk_spill_bytes)
+        .sum();
+    let total_memory_spill: i64 = resource_utilization
+        .iter()
+        .map(|r| r.memory_spill_bytes)
+        .sum();
+    let total_spill_gb =
+        (total_disk_spill + total_memory_spill) as f64 / (1024.0 * 1024.0 * 1024.0);
+
+    let spill_applications = resource_utilization
+        .iter()
+        .filter(|r| r.disk_spill_bytes > 0 || r.memory_spill_bytes > 0)
+        .map(|r| &r.app_id)
+        .collect::<std::collections::HashSet<_>>()
+        .len() as i64;
+
+    ResourceSummary {
+        total_executors,
+        unique_hosts,
+        total_memory_gb,
+        memory_utilization_percent,
+        total_cpu_cores,
+        cpu_utilization_percent,
+        total_spill_gb,
+        spill_applications,
     }
 }
 

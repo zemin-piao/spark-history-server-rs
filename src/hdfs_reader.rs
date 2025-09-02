@@ -31,7 +31,14 @@ impl HdfsReader {
                 for entry in entries.flatten() {
                     if entry.path().is_dir() {
                         if let Some(name) = entry.file_name().to_str() {
-                            if name.starts_with("application_") {
+                            // Support multiple Spark event log directory patterns:
+                            // - application_* (standard format)
+                            // - app-* (alternative format)
+                            // - eventlog_v2_* (structured event logs v2)
+                            if name.starts_with("application_")
+                                || name.starts_with("app-")
+                                || name.starts_with("eventlog_v2_")
+                            {
                                 app_ids.push(name.to_string());
                             }
                         }

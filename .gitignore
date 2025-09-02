@@ -3,6 +3,7 @@
 **/*.rs.bk
 *.pdb
 
+/data/
 
 # IDE
 .vscode/

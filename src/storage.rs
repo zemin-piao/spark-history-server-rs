@@ -181,7 +181,14 @@ impl HistoryProvider {
             let entry_path = log_dir.join(&entry_name);
 
             // Check if it's an application directory or event log file
-            if entry_name.starts_with("app-") || entry_name.starts_with("application_") {
+            // Support multiple Spark event log directory patterns:
+            // - application_* (standard format)
+            // - app-* (alternative format)
+            // - eventlog_v2_* (structured event logs v2)
+            if entry_name.starts_with("app-")
+                || entry_name.starts_with("application_")
+                || entry_name.starts_with("eventlog_v2_")
+            {
                 // Try to parse as application directory first
                 if let Ok(app_info) = self.parse_application_directory(&entry_path).await {
                     self.store.put(&app_info.id.clone(), app_info).await?;

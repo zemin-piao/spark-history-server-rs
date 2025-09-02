@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resources - Spark Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #0066cc;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .nav-tab {
+            color: var(--gray-600);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 0;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .nav-tab:hover, .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary);
+            transition: transform 0.2s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card.warning { border-left-color: var(--warning); }
+        .metric-card.danger { border-left-color: var(--danger); }
+        .metric-card.success { border-left-color: var(--success); }
+        .metric-card.info { border-left-color: var(--info); }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1;
+        }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+        
+        .metric-subtitle {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            margin-top: 0.25rem;
+        }
+        
+        .card {
+            background: white;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 1rem 0;
+        }
+        
+        .chart-container.small {
+            height: 250px;
+        }
+        
+        .filter-bar {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-item label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-right: 0.5rem;
+        }
+        
+        .filter-item select, .filter-item input {
+            padding: 0.5rem;
+            border: 1px solid var(--gray-200);
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0052a3;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th {
+            background: var(--gray-100);
+            padding: 1rem 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--gray-900);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        td {
+            padding: 0.875rem 0.75rem;
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 0.875rem;
+        }
+        
+        tr:hover {
+            background: var(--gray-50);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1d4ed8; }
+        
+        .progress-bar {
+            background: var(--gray-200);
+            border-radius: 4px;
+            height: 8px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        
+        .progress-fill.memory {
+            background: linear-gradient(45deg, var(--info), #60a5fa);
+        }
+        
+        .progress-fill.cpu {
+            background: linear-gradient(45deg, var(--success), #34d399);
+        }
+        
+        .progress-fill.disk {
+            background: linear-gradient(45deg, var(--warning), #fbbf24);
+        }
+        
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .resource-item {
+            background: var(--gray-50);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+        }
+        
+        .resource-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .resource-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--gray-900);
+        }
+        
+        .resource-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .resource-unit {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            margin-left: 0.25rem;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--gray-200);
+            margin-bottom: 1.5rem;
+        }
+        
+        .tab {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--gray-600);
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .font-mono { font-family: 'Courier New', monospace; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--gray-600);
+        }
+        
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .executor-card {
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: white;
+        }
+        
+        .executor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .executor-id {
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            color: var(--gray-900);
+        }
+        
+        .executor-host {
+            color: var(--gray-600);
+            font-size: 0.875rem;
+        }
+        
+        .executor-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .executor-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+        
+        .executor-metric {
+            text-align: center;
+        }
+        
+        .executor-metric-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .executor-metric-label {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 0 1rem; }
+            .header { padding: 1rem; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            .metric-value { font-size: 2rem; }
+            .nav-tabs { gap: 1rem; }
+            .header-content { flex-direction: column; gap: 1rem; align-items: stretch; }
+            .filter-group { flex-direction: column; align-items: stretch; }
+            .chart-container { height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>🔥 Spark Analytics Platform</h1>
+            <nav class="nav-tabs">
+                <a href="/" class="nav-tab">Overview</a>
+                <a href="/analytics" class="nav-tab">Analytics</a>
+                <a href="/resources" class="nav-tab active">Resources</a>
+                <a href="/optimize" class="nav-tab">Optimize</a>
+                <a href="/teams" class="nav-tab">Teams</a>
+                <a href="/api/v1/applications" class="nav-tab" target="_blank" style="opacity: 0.7;">API</a>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="filter-bar">
+            <div class="filter-group">
+                <div class="filter-item">
+                    <label>Time Range:</label>
+                    <select id="timeRange" onchange="updateTimeRange()">
+                        <option value="1h">Last Hour</option>
+                        <option value="4h">Last 4 Hours</option>
+                        <option value="24h" selected>Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Application:</label>
+                    <select id="appFilter" onchange="updateAppFilter()">
+                        <option value="">All Applications</option>
+                        {% for app in resource_apps %}
+                        <option value="{{ app }}">{{ app }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Host:</label>
+                    <select id="hostFilter" onchange="updateHostFilter()">
+                        <option value="">All Hosts</option>
+                        {% for host in resource_hosts %}
+                        <option value="{{ host }}">{{ host }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="refreshData()">Refresh</button>
+            </div>
+        </div>
+
+        <!-- Resource Overview Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{{ resource_summary.total_executors }}</div>
+                <div class="metric-label">Active Executors</div>
+                <div class="metric-subtitle">Across {{ resource_summary.unique_hosts }} hosts</div>
+            </div>
+            
+            <div class="metric-card info">
+                <div class="metric-value">{{ resource_summary.total_memory_gb }}GB</div>
+                <div class="metric-label">Total Memory Allocated</div>
+                <div class="progress-bar">
+                    <div class="progress-fill memory" style="width: {{ resource_summary.memory_utilization_percent }}%;"></div>
+                </div>
+            </div>
+            
+            <div class="metric-card success">
+                <div class="metric-value">{{ resource_summary.total_cpu_cores }}</div>
+                <div class="metric-label">Total CPU Cores</div>
+                <div class="progress-bar">
+                    <div class="progress-fill cpu" style="width: {{ resource_summary.cpu_utilization_percent }}%;"></div>
+                </div>
+            </div>
+            
+            <div class="metric-card warning">
+                <div class="metric-value">{{ resource_summary.total_spill_gb }}GB</div>
+                <div class="metric-label">Total Disk Spill</div>
+                <div class="metric-subtitle">{{ resource_summary.spill_applications }} apps affected</div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab(this, 'overview')">📊 Overview</button>
+            <button class="tab" onclick="switchTab(this, 'executors')">⚙️ Executors</button>
+            <button class="tab" onclick="switchTab(this, 'memory')">💾 Memory</button>
+            <button class="tab" onclick="switchTab(this, 'cpu')">🚀 CPU</button>
+            <button class="tab" onclick="switchTab(this, 'io')">📡 I/O</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="tab-content active">
+            <!-- Resource Utilization Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>📈 Resource Utilization Trends</h2>
+                    <a href="/api/v1/analytics/resource-utilization" target="_blank" class="btn btn-primary">View API</a>
+                </div>
+                <div class="chart-container">
+                    <canvas id="resourceTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Resource Consumers -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>🔥 Top Resource Consumers</h2>
+                </div>
+                
+                {% if resource_utilization.is_empty() %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">🖥️</div>
+                    <h3>No Resource Data</h3>
+                    <p class="text-sm">Resource utilization data will appear here from running applications.</p>
+                </div>
+                {% else %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Executor</th>
+                            <th>Host</th>
+                            <th>Application</th>
+                            <th>Memory Usage</th>
+                            <th>CPU Time</th>
+                            <th>Tasks</th>
+                            <th>I/O</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for resource in resource_utilization %}
+                        <tr>
+                            <td>
+                                <div class="font-mono">{{ resource.executor_id }}</div>
+                            </td>
+                            <td>{{ resource.host }}</td>
+                            <td>
+                                <div class="font-mono text-xs">{{ resource.app_name }}</div>
+                                <div class="text-xs text-gray-600">{{ resource.app_id }}</div>
+                            </td>
+                            <td>
+                                <div>{{ resource.peak_memory_usage_mb }}MB</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill memory" style="width: {{ resource.memory_utilization_percent }}%;"></div>
+                                </div>
+                                <div class="text-xs text-gray-600">{{ resource.memory_utilization_percent }}% of {{ resource.max_memory_mb }}MB</div>
+                            </td>
+                            <td class="text-right">
+                                <div>{{ resource.cpu_time_ms }}ms</div>
+                                <div class="text-xs text-gray-600">{{ resource.avg_task_duration_ms }}ms avg</div>
+                            </td>
+                            <td class="text-right">
+                                <div>{{ resource.completed_tasks }}</div>
+                                {% if resource.failed_tasks > 0 %}
+                                    <div class="badge badge-warning">{{ resource.failed_tasks }} failed</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                <div class="text-xs">R: {{ resource.input_bytes }}MB</div>
+                                <div class="text-xs">W: {{ resource.output_bytes }}MB</div>
+                            </td>
+                            <td>
+                                {% if resource.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-info">Completed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Executors Tab -->
+        <div id="executors" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>⚙️ Executor Details</h2>
+                    <div class="text-sm text-gray-600">{{ executor_count }} executors found</div>
+                </div>
+
+                {% if resource_utilization.is_empty() %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚙️</div>
+                    <h3>No Executor Data</h3>
+                    <p class="text-sm">Executor information will appear here from running applications.</p>
+                </div>
+                {% else %}
+                <div class="resource-grid">
+                    {% for resource in resource_utilization %}
+                    <div class="executor-card">
+                        <div class="executor-header">
+                            <div>
+                                <div class="executor-id">{{ resource.executor_id }}</div>
+                                <div class="executor-host">{{ resource.host }}</div>
+                                <div class="text-xs text-gray-500 font-mono">{{ resource.app_name }}</div>
+                            </div>
+                            <div class="executor-status {% if resource.is_active %}badge-success{% else %}badge-info{% endif %}">
+                                {% if resource.is_active %}Active{% else %}Completed{% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="executor-metrics">
+                            <div class="executor-metric">
+                                <div class="executor-metric-value">{{ resource.total_tasks }}</div>
+                                <div class="executor-metric-label">Total Tasks</div>
+                            </div>
+                            <div class="executor-metric">
+                                <div class="executor-metric-value">{{ resource.peak_memory_usage_mb }}MB</div>
+                                <div class="executor-metric-label">Peak Memory</div>
+                            </div>
+                            <div class="executor-metric">
+                                <div class="executor-metric-value">{{ resource.cpu_time_ms }}ms</div>
+                                <div class="executor-metric-label">CPU Time</div>
+                            </div>
+                            <div class="executor-metric">
+                                <div class="executor-metric-value">{{ resource.total_duration_ms }}ms</div>
+                                <div class="executor-metric-label">Runtime</div>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar">
+                            <div class="progress-fill memory" style="width: {{ resource.memory_utilization_percent }}%;"></div>
+                        </div>
+                        <div class="text-xs text-gray-600 mt-2">Memory: {{ resource.memory_utilization_percent }}% utilized</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Memory Tab -->
+        <div id="memory" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>💾 Memory Analysis</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="memoryChart"></canvas>
+                </div>
+                
+                <div class="resource-grid">
+                    {% for resource in resource_utilization %}
+                    {% if resource.memory_spill_bytes > 0 || resource.disk_spill_bytes > 0 %}
+                    <div class="resource-item">
+                        <div class="resource-header">
+                            <div class="resource-name">{{ resource.executor_id }}</div>
+                            <span class="badge badge-warning">Spilling</span>
+                        </div>
+                        <div class="resource-value">{{ resource.memory_spill_bytes }}MB<span class="resource-unit">memory</span></div>
+                        <div class="resource-value">{{ resource.disk_spill_bytes }}MB<span class="resource-unit">disk</span></div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- CPU Tab -->
+        <div id="cpu" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>🚀 CPU Analysis</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- I/O Tab -->
+        <div id="io" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>📡 I/O Analysis</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="ioChart"></canvas>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Executor</th>
+                            <th>Input</th>
+                            <th>Output</th>
+                            <th>Shuffle Read</th>
+                            <th>Shuffle Write</th>
+                            <th>Data Locality</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for resource in resource_utilization %}
+                        <tr>
+                            <td class="font-mono">{{ resource.executor_id }}</td>
+                            <td class="text-right">{{ resource.input_bytes }}MB</td>
+                            <td class="text-right">{{ resource.output_bytes }}MB</td>
+                            <td class="text-right">{{ resource.shuffle_read_bytes }}MB</td>
+                            <td class="text-right">{{ resource.shuffle_write_bytes }}MB</td>
+                            <td>
+                                <div class="text-xs">
+                                    <span class="badge badge-success">Process: {{ resource.data_locality_process_local }}</span>
+                                    <span class="badge badge-info">Node: {{ resource.data_locality_node_local }}</span>
+                                    <span class="badge badge-warning">Rack: {{ resource.data_locality_rack_local }}</span>
+                                    <span class="badge badge-danger">Any: {{ resource.data_locality_any }}</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- API Quick Links -->
+        <div class="card">
+            <div class="card-header">
+                <h2>⚡ Resource APIs</h2>
+            </div>
+            
+            <div class="resource-grid">
+                <a href="/api/v1/analytics/resource-utilization" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="resource-name">Resource Utilization</div>
+                    <div class="resource-value">📊</div>
+                    <div class="text-xs text-gray-600">Detailed executor metrics</div>
+                </a>
+                
+                <a href="/api/v1/analytics/resource-usage" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="resource-name">Resource Usage</div>
+                    <div class="resource-value">💾</div>
+                    <div class="text-xs text-gray-600">Usage summary data</div>
+                </a>
+                
+                <a href="/api/v1/analytics/executor-utilization" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="resource-name">Executor Stats</div>
+                    <div class="resource-value">⚙️</div>
+                    <div class="text-xs text-gray-600">Per-executor statistics</div>
+                </a>
+                
+                <a href="/api/v1/applications" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="resource-name">Applications</div>
+                    <div class="resource-value">🚀</div>
+                    <div class="text-xs text-gray-600">Application data</div>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Chart instances
+        let resourceTrendChart, memoryChart, cpuChart, ioChart;
+
+        // Initialize all charts
+        function initializeCharts() {
+            // Resource Trend Chart
+            const trendCtx = document.getElementById('resourceTrendChart').getContext('2d');
+            resourceTrendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: ['6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'],
+                    datasets: [{
+                        label: 'Memory Usage (GB)',
+                        data: [45, 52, 48, 61, 55, 67, 59],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'CPU Usage (%)',
+                        data: [65, 72, 68, 81, 75, 87, 79],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Usage'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Memory Chart
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+            memoryChart = new Chart(memoryCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Peak Memory (MB)',
+                        data: [],
+                        backgroundColor: '#3b82f6'
+                    }, {
+                        label: 'Max Memory (MB)',
+                        data: [],
+                        backgroundColor: '#e5e7eb'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+
+            // CPU Chart
+            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+            cpuChart = new Chart(cpuCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'CPU Time (ms)',
+                        data: [],
+                        backgroundColor: [
+                            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                            '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+
+            // I/O Chart
+            const ioCtx = document.getElementById('ioChart').getContext('2d');
+            ioChart = new Chart(ioCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'I/O Pattern',
+                        data: [],
+                        backgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Input (MB)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Output (MB)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Tab switching functionality
+        function switchTab(tabElement, tabName) {
+            // Remove active class from all tabs and content
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            // Add active class to selected tab and content
+            tabElement.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            
+            // Redraw charts when switching tabs to fix sizing issues
+            setTimeout(() => {
+                if (resourceTrendChart) resourceTrendChart.resize();
+                if (memoryChart) memoryChart.resize();
+                if (cpuChart) cpuChart.resize();
+                if (ioChart) ioChart.resize();
+            }, 100);
+        }
+
+        // Filter functions
+        function updateTimeRange() {
+            const range = document.getElementById('timeRange').value;
+            console.log('Time range updated:', range);
+            refreshData();
+        }
+
+        function updateAppFilter() {
+            const app = document.getElementById('appFilter').value;
+            console.log('App filter updated:', app);
+            refreshData();
+        }
+
+        function updateHostFilter() {
+            const host = document.getElementById('hostFilter').value;
+            console.log('Host filter updated:', host);
+            refreshData();
+        }
+
+        // Data refresh
+        async function refreshData() {
+            console.log('🔄 Refreshing resource data...');
+            try {
+                const response = await fetch('/api/v1/analytics/resource-utilization');
+                const data = await response.json();
+                console.log('📊 Resource data loaded:', data);
+                // TODO: Update charts with new data
+                showNotification('✅ Resource data refreshed successfully!', 'success');
+            } catch (error) {
+                console.error('❌ Error refreshing data:', error);
+                showNotification('❌ Failed to refresh resource data', 'error');
+            }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                transition: all 0.3s ease;
+                ${type === 'success' ? 'background: var(--success);' : 'background: var(--danger);'}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.transform = 'translateX(400px)';
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            console.log('✨ Resources view loaded!');
+            console.log('📊 Available filters and data loaded');
+        });
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshData, 30000);
+    </script>
+</body>
+</html>

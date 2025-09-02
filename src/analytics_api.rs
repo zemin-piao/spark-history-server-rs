@@ -21,6 +21,15 @@ pub fn analytics_router() -> Router<HistoryProvider> {
             get(get_resource_utilization_metrics),
         )
         .route("/analytics/performance-trends", get(get_performance_trends))
+        .route("/analytics/gc-time-trends", get(get_gc_time_trends))
+        .route(
+            "/analytics/cpu-utilization-analysis",
+            get(get_cpu_utilization_analysis),
+        )
+        .route(
+            "/analytics/memory-usage-analysis",
+            get(get_memory_usage_analysis),
+        )
         .route("/analytics/cross-app-summary", get(get_cross_app_summary))
         .route("/analytics/task-distribution", get(get_task_distribution))
         .route(
@@ -83,6 +92,69 @@ async fn get_performance_trends(
     };
 
     Ok(Json(trends))
+}
+
+/// GC time trends analytics
+async fn get_gc_time_trends(
+    State(provider): State<HistoryProvider>,
+    Query(params): Query<AnalyticsQuery>,
+) -> Result<Json<Vec<GcTimeTrend>>, StatusCode> {
+    info!("GET /analytics/gc-time-trends - params: {:?}", params);
+
+    let store = provider.get_duckdb_store();
+    let trends = match store.get_gc_time_trends(&params).await {
+        Ok(data) => data,
+        Err(e) => {
+            tracing::error!("Failed to get GC time trends: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    Ok(Json(trends))
+}
+
+/// CPU utilization and idle cores analysis
+async fn get_cpu_utilization_analysis(
+    State(provider): State<HistoryProvider>,
+    Query(params): Query<AnalyticsQuery>,
+) -> Result<Json<Vec<CpuUtilizationAnalysis>>, StatusCode> {
+    info!(
+        "GET /analytics/cpu-utilization-analysis - params: {:?}",
+        params
+    );
+
+    let store = provider.get_duckdb_store();
+    let analysis = match store.get_cpu_utilization_analysis(&params).await {
+        Ok(data) => data,
+        Err(e) => {
+            tracing::error!("Failed to get CPU utilization analysis: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    Ok(Json(analysis))
+}
+
+/// Memory usage analysis and segregation
+async fn get_memory_usage_analysis(
+    State(provider): State<HistoryProvider>,
+    Query(params): Query<AnalyticsQuery>,
+) -> Result<Json<Vec<MemoryUsageAnalysis>>, StatusCode> {
+    info!(
+        "GET /analytics/memory-usage-analysis - params: {:?}",
+        params
+    );
+
+    let store = provider.get_duckdb_store();
+    let analysis = match store.get_memory_usage_analysis(&params).await {
+        Ok(data) => data,
+        Err(e) => {
+            tracing::error!("Failed to get memory usage analysis: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    Ok(Json(analysis))
 }
 
 /// Cross-application summary analytics
@@ -171,6 +243,49 @@ pub struct PerformanceTrend {
     pub failed_tasks: i64,
     pub avg_input_bytes: Option<f64>,
     pub avg_output_bytes: Option<f64>,
+}
+
+/// GC time trend data structure
+#[derive(Debug, Clone, Serialize)]
+pub struct GcTimeTrend {
+    pub date: String,
+    pub app_id: String,
+    pub total_gc_time_ms: i64,
+    pub avg_gc_time_ms: Option<f64>,
+    pub total_tasks: i64,
+    pub gc_time_per_task_ms: Option<f64>,
+}
+
+/// CPU utilization and idle cores analysis
+#[derive(Debug, Clone, Serialize)]
+pub struct CpuUtilizationAnalysis {
+    pub date: String,
+    pub app_id: String,
+    pub executor_id: String,
+    pub total_tasks: i64,
+    pub total_duration_ms: i64,
+    pub actual_cpu_time_ms: i64,
+    pub theoretical_cpu_time_ms: i64,
+    pub idle_cpu_time_ms: i64,
+    pub cpu_utilization_percent: Option<f64>,
+    pub efficiency_rating: String, // "High", "Medium", "Low"
+}
+
+/// Memory usage analysis and segregation
+#[derive(Debug, Clone, Serialize)]
+pub struct MemoryUsageAnalysis {
+    pub date: String,
+    pub app_id: String,
+    pub executor_id: String,
+    pub max_memory_mb: i64,
+    pub peak_memory_usage_mb: i64,
+    pub avg_memory_usage_mb: Option<f64>,
+    pub memory_utilization_percent: Option<f64>,
+    pub memory_spill_mb: i64,
+    pub disk_spill_mb: i64,
+    pub total_tasks: i64,
+    pub memory_efficiency_rating: String, // "Excellent", "Good", "Poor", "Critical"
+    pub spill_ratio: Option<f64>,         // memory_spill / peak_memory_usage
 }
 
 /// Cross-application summary
