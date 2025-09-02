@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Spark Analytics Platform{% endblock %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #0066cc;
+            --color-secondary: #f8fafc;
+            --color-accent: #10b981;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+            --color-text: #1f2937;
+            --color-text-light: #6b7280;
+            --color-border: #e5e7eb;
+            --color-bg: #ffffff;
+            --color-bg-light: #f9fafb;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-bg-light);
+            color: var(--color-text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Header */
+        .header {
+            background: var(--color-bg);
+            border-bottom: 1px solid var(--color-border);
+            padding: 1rem 0;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--color-primary);
+        }
+
+        .logo::before {
+            content: "⚡";
+            font-size: 1.5rem;
+        }
+
+        .nav {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .nav-link {
+            padding: 0.625rem 1rem;
+            text-decoration: none;
+            color: var(--color-text-light);
+            border-radius: var(--radius);
+            font-weight: 500;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+        }
+
+        .nav-link:hover {
+            background: var(--color-secondary);
+            color: var(--color-text);
+        }
+
+        .nav-link.active {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        /* Main Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--color-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            border: 1px solid var(--color-border);
+        }
+
+        .card-header {
+            padding: 1.5rem 1.5rem 1rem 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+            background: var(--color-bg);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--color-text);
+            margin-bottom: 0.25rem;
+        }
+
+        .card-subtitle {
+            font-size: 0.875rem;
+            color: var(--color-text-light);
+        }
+
+        .card-content {
+            padding: 1.5rem;
+        }
+
+        /* Grid Layouts */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+        @media (max-width: 1024px) {
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+            .grid-3 { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 640px) {
+            .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+            .container { padding: 1rem; }
+            .header-content { padding: 0 1rem; }
+        }
+
+        /* Metric Cards */
+        .metric-card {
+            background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-secondary) 100%);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--color-primary);
+        }
+
+        .metric-card.warning::before { background: var(--color-warning); }
+        .metric-card.danger::before { background: var(--color-danger); }
+        .metric-card.success::before { background: var(--color-accent); }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--color-text);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--color-text-light);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-subtitle {
+            font-size: 0.75rem;
+            color: var(--color-text-light);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* Progress Bars */
+        .progress-container {
+            margin-top: 0.75rem;
+        }
+
+        .progress-bar {
+            background: var(--color-border);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+            background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 100%);
+        }
+
+        .progress-fill.warning { background: linear-gradient(90deg, var(--color-warning) 0%, #fbbf24 100%); }
+        .progress-fill.danger { background: linear-gradient(90deg, var(--color-danger) 0%, #f87171 100%); }
+
+        /* Tables */
+        .table-container {
+            overflow: hidden;
+            border-radius: var(--radius);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .table th {
+            background: var(--color-secondary);
+            padding: 1rem 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--color-text);
+            border-bottom: 1px solid var(--color-border);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .table td {
+            padding: 0.875rem 0.75rem;
+            border-bottom: 1px solid var(--color-border);
+            color: var(--color-text);
+        }
+
+        .table tr:hover {
+            background: var(--color-bg-light);
+        }
+
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            line-height: 1;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-info {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        /* Alert Cards */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+            border-left: 4px solid;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            border-color: var(--color-warning);
+            color: #92400e;
+        }
+
+        .alert-danger {
+            background: #fef2f2;
+            border-color: var(--color-danger);
+            color: #991b1b;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            border-color: var(--color-primary);
+            color: #1d4ed8;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        .chart-small {
+            height: 200px;
+        }
+
+        /* Utility Classes */
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .text-center { text-align: center; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mt-4 { margin-top: 1rem; }
+
+        /* Loading States */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .nav {
+                display: none;
+            }
+            
+            .metric-value {
+                font-size: 2rem;
+            }
+            
+            .table {
+                font-size: 0.8rem;
+            }
+            
+            .table th,
+            .table td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">Spark Analytics Platform</div>
+            <nav class="nav">
+                <a href="/" class="nav-link {% if active_tab == 'cluster' %}active{% endif %}">Overview</a>
+                <a href="/optimize" class="nav-link {% if active_tab == 'optimize' %}active{% endif %}">Optimization</a>
+                <a href="/capacity" class="nav-link {% if active_tab == 'capacity' %}active{% endif %}">Capacity</a>
+                <a href="/teams" class="nav-link {% if active_tab == 'teams' %}active{% endif %}">Teams</a>
+                <a href="/api/v1/applications" class="nav-link">API</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script>
+        // Auto-refresh every 30 seconds
+        setTimeout(() => window.location.reload(), 30000);
+        
+        // Chart.js default configuration
+        Chart.defaults.font.family = 'Inter, sans-serif';
+        Chart.defaults.color = '#6b7280';
+        Chart.defaults.backgroundColor = 'rgba(0, 102, 204, 0.1)';
+        Chart.defaults.borderColor = '#0066cc';
+    </script>
+</body>
+</html>

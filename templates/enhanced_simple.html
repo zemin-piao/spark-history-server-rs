@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Analytics Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0066cc;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-600: #4b5563;
+            --gray-900: #111827;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary);
+            transition: transform 0.2s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .metric-card.warning {
+            border-left-color: var(--warning);
+        }
+        
+        .metric-card.danger {
+            border-left-color: var(--danger);
+        }
+        
+        .metric-card.success {
+            border-left-color: var(--success);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .metric-subtitle {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+        }
+        
+        .progress-bar {
+            background: #e5e7eb;
+            border-radius: 4px;
+            height: 6px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        
+        .progress-fill.warning {
+            background: var(--warning);
+        }
+        
+        .progress-fill.danger {
+            background: var(--danger);
+        }
+        
+        .card {
+            background: white;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--gray-900);
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid;
+        }
+        
+        .alert.danger {
+            background: #fef2f2;
+            border-color: var(--danger);
+            color: #991b1b;
+        }
+        
+        .alert.warning {
+            background: #fffbeb;
+            border-color: var(--warning);
+            color: #92400e;
+        }
+        
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th {
+            background: var(--gray-100);
+            padding: 1rem 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--gray-900);
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        td {
+            padding: 0.875rem 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+        }
+        
+        tr:hover {
+            background: var(--gray-50);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-info {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .font-bold { font-weight: 700; }
+        .text-green { color: var(--success); }
+        .text-red { color: var(--danger); }
+        .text-yellow { color: var(--warning); }
+        
+        @media (max-width: 768px) {
+            .container { padding: 0 1rem; }
+            .header { padding: 1rem; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            .metric-value { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Spark Analytics Platform</h1>
+    </div>
+    
+    <div class="container">
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{{ cross_app_summary.total_applications }}</div>
+                <div class="metric-label">Total Applications</div>
+                <div class="metric-subtitle">In event history</div>
+            </div>
+            
+            <div class="metric-card success">
+                <div class="metric-value">{{ cross_app_summary.active_applications }}</div>
+                <div class="metric-label">Active Applications</div>
+                <div class="metric-subtitle">Currently running</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">{{ cross_app_summary.total_tasks_completed }}</div>
+                <div class="metric-label">Tasks Completed</div>
+                <div class="metric-subtitle">{{ cross_app_summary.total_tasks_failed }} failed</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">{{ cross_app_summary.peak_concurrent_executors }}</div>
+                <div class="metric-label">Peak Executors</div>
+                <div class="metric-subtitle">Maximum concurrent</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Platform Overview</h2>
+            <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="font-size: 2rem; font-weight: bold; color: var(--primary);">{{ cross_app_summary.total_events }}</div>
+                    <div style="font-size: 0.875rem; color: var(--gray-600);">Total Events</div>
+                </div>
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="font-size: 2rem; font-weight: bold; color: var(--success);">{{ cross_app_summary.avg_task_duration_ms }}s</div>
+                    <div style="font-size: 0.875rem; color: var(--gray-600);">Avg Task Duration</div>
+                </div>
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="font-size: 2rem; font-weight: bold; color: var(--warning);">{{ cross_app_summary.total_data_processed_gb }}GB</div>
+                    <div style="font-size: 0.875rem; color: var(--gray-600);">Data Processed</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Active Applications</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Application ID</th>
+                        <th>User</th>
+                        <th>Runtime</th>
+                        <th>Resources</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in active_applications %}
+                    <tr>
+                        <td>
+                            <a href="/api/v1/applications/{{ app.id }}" target="_blank" style="color: var(--primary); text-decoration: none;">
+                                {{ app.id }}
+                            </a>
+                        </td>
+                        <td>{{ app.user }}</td>
+                        <td>{{ app.duration }}</td>
+                        <td>{{ app.cores }} cores, {{ app.memory }}GB</td>
+                        <td>
+                            <span class="badge badge-info">{{ app.status }}</span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--gray-600); padding: 2rem;">
+                            No active applications
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <p style="text-align: center; margin-top: 2rem;">
+            <a href="/optimize" style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                View Performance Analytics →
+            </a>
+        </p>
+    </div>
+</body>
+</html>

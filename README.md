@@ -21,7 +21,7 @@ A **analytics-first** Spark History Server implementation in Rust, purpose-built
 - ✅ **HDFS Support**: Native HDFS integration via `hdfs-native`
 - ✅ **Enterprise Scale**: **Load tested with 100K applications, 2M events**
 - ✅ **High Performance**: **10,700 events/sec sustained throughput**
-- 🚧 **Web UI**: Not implemented (API-only service)
+- ✅ **Web Dashboard**: Analytics-focused web dashboard with cluster overview, performance insights, and optimization recommendations
 - 🚧 **Production Features**: Metrics, monitoring, security features planned
 
 ## 🎯 **Analytics-First Design Philosophy**
@@ -51,6 +51,7 @@ This Spark History Server is **purpose-built for analytics**, not individual app
 - **⚡ High-Throughput Processing**: Batch processing of compressed event logs with 10K+ events/sec performance
 - **🔌 Dual API Design**: Standard Spark History Server v1 compatibility + advanced analytics endpoints
 - **📦 Zero Deployment Complexity**: Single binary with embedded database - no external dependencies
+- **🎨 Built-in Web Dashboard**: Modern analytics dashboard with cluster overview, performance trends, and optimization insights
 - **🚀 Enterprise Proven**: **Load tested with 100K+ applications and sub-10ms analytical query response times**
 
 ## 🌐 **API Endpoints & Capabilities**
@@ -86,6 +87,15 @@ For detailed individual application analysis, use the standard Spark History Ser
 - Streaming batch analysis (`/streaming/*` endpoints)
 - Executor thread dumps and live metrics
 - Event log downloads and detailed task analysis
+
+### 🎨 **Web Dashboard**
+
+**✅ Analytics-Focused Dashboard Views**
+- `GET /` - **Cluster Overview**: Real-time cluster status, active applications, and key metrics summary
+- `GET /analytics` - **Analytics Dashboard**: Comprehensive performance analytics and cross-application insights
+- `GET /optimize` - **Optimization View**: Performance trends, resource utilization, and task distribution analysis
+- `GET /resources` - **Resource Management**: Executor utilization and capacity planning insights *(coming soon)*
+- `GET /teams` - **Team Analytics**: User/team resource attribution and usage patterns *(coming soon)*
 
 ### 🏥 **System Health**
 - `GET /health` - Health check and system status
@@ -145,13 +155,14 @@ cargo run
 # Health check
 curl http://localhost:18080/health
 
-# List applications
+# Web Dashboard (open in browser)
+open http://localhost:18080                    # Cluster overview dashboard
+open http://localhost:18080/analytics          # Analytics dashboard  
+open http://localhost:18080/optimize           # Optimization insights
+
+# API endpoints
 curl "http://localhost:18080/api/v1/applications?limit=10"
-
-# Get specific application
 curl "http://localhost:18080/api/v1/applications/{app_id}"
-
-# Advanced analytics
 curl "http://localhost:18080/api/v1/analytics/cross-app-summary"
 curl "http://localhost:18080/api/v1/analytics/performance-trends"
 curl "http://localhost:18080/api/v1/analytics/resource-usage"
@@ -318,8 +329,10 @@ The Spark History Server is built around a modern, analytics-first architecture 
    - **Flexible Schema**: Combined structured fields + JSON column for event diversity
    - **Cross-Application Queries**: SQL analytics across all Spark applications simultaneously
 
-3. **REST API Server**
+3. **REST API Server & Web Dashboard**
    - **Dual API Support**: Standard Spark History Server v1 + advanced analytics endpoints  
+   - **Built-in Web Dashboard**: Server-side rendered dashboard using Askama templates
+   - **Multiple Dashboard Views**: Cluster overview, analytics, optimization insights, and resource management
    - **In-Memory Caching**: Hot data caching for frequently accessed applications
    - **Async I/O**: Built with Axum and Tokio for high concurrency
 
@@ -327,13 +340,13 @@ The Spark History Server is built around a modern, analytics-first architecture 
 
 ```
 ┌─────────────────────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│        Storage Layer            │ -> │  Event Processor │ -> │   DuckDB Store   │ -> │   API Server    │
+│        Storage Layer            │ -> │  Event Processor │ -> │   DuckDB Store   │ -> │ API + Dashboard │
 │                                 │    │                  │    │                  │    │                 │
 │ HDFS (with Kerberos):           │    │ • Argument-based │    │ • Events Table   │    │ • REST API      │
 │ • hdfs://namenode:9000          │    │   Reader Switch  │    │ • JSON + Hot     │    │ • Analytics     │ 
-│ • /spark-events/*.lz4           │    │ • Incremental    │    │   Fields         │    │ • Cross-App     │
-│ • Kerberos Authentication       │    │   Scanning       │    │ • Timeout        │    │ • Health Check  │
-│                                 │    │ • Batch Writing  │    │   Handling       │    │                 │
+│ • /spark-events/*.lz4           │    │ • Incremental    │    │   Fields         │    │ • Web Dashboard │
+│ • Kerberos Authentication       │    │   Scanning       │    │ • Timeout        │    │ • Multi-View UI │
+│                                 │    │ • Batch Writing  │    │   Handling       │    │ • Health Check  │
 │ Local FileSystem:               │    │ • Health Checks  │    │ • Schema Flex    │    │                 │
 │ • ./spark-events/*.snappy       │    │                  │    │                  │    │                 │
 │ • .inprogress files             │    │                  │    │                  │    │                 │
@@ -408,7 +421,18 @@ cargo test test_write_performance_scaling --release -- --nocapture
 - **File Processing Pipeline**: End-to-end event log processing
 - **Analytical Query Performance**: Complex cross-app analytics
 
-See [LOAD_TESTING.md](LOAD_TESTING.md) for detailed performance analysis and benchmarking guide.
+See [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) for detailed performance analysis and benchmarking guide.
+
+---
+
+## Documentation
+
+Additional documentation is available in the `docs/` folder:
+
+- **[docs/LOAD_TESTING.md](docs/LOAD_TESTING.md)** - Comprehensive load testing and performance benchmarking guide
+- **[docs/HDFS_INTEGRATION.md](docs/HDFS_INTEGRATION.md)** - Detailed HDFS integration and configuration guide  
+- **[docs/SCRIPT_ORGANIZATION.md](docs/SCRIPT_ORGANIZATION.md)** - Development scripts and tooling documentation
+- **[docs/demo.md](docs/demo.md)** - Demo and example usage scenarios
 
 ---
 
@@ -446,9 +470,11 @@ RUST_LOG=debug cargo test test_kerberos_valid_authentication -- --nocapture
 
 - **`src/storage/duckdb_store.rs`**: Core DuckDB integration and analytics engine
 - **`src/event_processor.rs`**: Spark event log parsing and processing
-- **`src/api.rs`**: Standard Spark History Server API v1 endpoints
+- **`src/api.rs`**: Standard Spark History Server API v1 endpoints + main router
 - **`src/analytics_api.rs`**: Advanced cross-application analytics endpoints
+- **`src/dashboard.rs`**: Web dashboard controllers and template rendering
 - **`src/storage/file_reader.rs`**: File system abstraction (local + HDFS)
+- **`templates/`**: Askama HTML templates for dashboard views
 
 ### Adding New Analytics
 
@@ -456,6 +482,13 @@ RUST_LOG=debug cargo test test_kerberos_valid_authentication -- --nocapture
 2. Define response model in `src/models.rs`
 3. Add tests to `tests/analytics_api_test.rs`
 4. Update API documentation
+
+### Adding Dashboard Features
+
+1. Add controller function to `src/dashboard.rs`
+2. Create or modify HTML template in `templates/`
+3. Add route to dashboard router
+4. Test dashboard view in browser at `http://localhost:18080`
 
 ### Performance Tuning
 

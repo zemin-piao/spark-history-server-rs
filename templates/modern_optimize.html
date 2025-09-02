@@ -1,0 +1,291 @@
+{% extends "modern_base.html" %}
+{% block title %}Platform Optimization - Spark Analytics Platform{% endblock %}
+
+{% block content %}
+<!-- Action Items Dashboard -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Priority Action Items</div>
+        <div class="card-subtitle">Immediate platform optimization opportunities</div>
+    </div>
+    <div class="card-content">
+        <div class="grid grid-3">
+            <div class="alert alert-danger">
+                <div class="alert-title">URGENT</div>
+                ML Platform team efficiency at 45% - investigate memory over-allocation costing $8.5K/week
+            </div>
+            <div class="alert alert-warning">
+                <div class="alert-title">WARNING</div>
+                Cluster capacity exhaustion in {{ cluster_stats.projected_capacity_days }} days at current growth rate
+            </div>
+            <div class="alert alert-info">
+                <div class="alert-title">OPPORTUNITY</div>
+                Ad-hoc queries consuming 8% cluster but only 34% efficient - quick wins available
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resource Waste Analysis -->
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Weekly Resource Waste</div>
+            <div class="card-subtitle">Potential savings by job pattern</div>
+        </div>
+        <div class="card-content">
+            <div class="chart-container">
+                <canvas id="wasteChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Team Efficiency Comparison</div>
+            <div class="card-subtitle">Resource utilization effectiveness</div>
+        </div>
+        <div class="card-content">
+            <div class="chart-container">
+                <canvas id="efficiencyChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resource Waste Detection Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Resource Optimization Targets</div>
+        <div class="card-subtitle">Jobs with highest optimization potential</div>
+    </div>
+    <div class="card-content">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Job Pattern</th>
+                        <th>Team</th>
+                        <th>Weekly CPU Waste</th>
+                        <th>Memory Over-Allocation</th>
+                        <th>Efficiency Score</th>
+                        <th>Potential Savings</th>
+                        <th>Priority</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in resource_hogs %}
+                    <tr>
+                        <td>
+                            <div class="font-semibold">{{ job.name }}</div>
+                        </td>
+                        <td>
+                            <span class="badge badge-info">{{ job.user }}</span>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-red-600">{{ job.cpu_hours }}h</span>
+                                <div class="text-xs text-gray-500">wasted</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-orange-600">{{ job.peak_memory_gb }}GB</span>
+                                <div class="text-xs text-gray-500">unused</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium {% if job.efficiency_score >= 70 %}text-green-600{% else if job.efficiency_score >= 50 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                    {{ job.efficiency_score }}%
+                                </span>
+                                <div class="progress-bar" style="width: 50px; height: 4px;">
+                                    <div class="progress-fill {% if job.efficiency_score >= 70 %}{% else if job.efficiency_score >= 50 %}warning{% else %}danger{% endif %}" style="width: {{ job.efficiency_score }}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="font-bold text-green-600">${{ job.optimization_potential }}/week</div>
+                        </td>
+                        <td>
+                            {% if job.efficiency_score < 50 %}
+                                <span class="badge badge-danger">Critical</span>
+                            {% else if job.efficiency_score < 70 %}
+                                <span class="badge badge-warning">High</span>
+                            {% else %}
+                                <span class="badge badge-info">Medium</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-gray-500 py-8">No optimization targets identified</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Optimization Recommendations -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Platform Optimization Recommendations</div>
+        <div class="card-subtitle">Actionable insights for platform efficiency</div>
+    </div>
+    <div class="card-content">
+        <div class="grid">
+            {% for rec in recommendations %}
+            <div class="card" style="border-left: 4px solid {% if rec.priority == 'HIGH' %}#ef4444{% else if rec.priority == 'MEDIUM' %}#f59e0b{% else %}#0066cc{% endif %};">
+                <div class="card-content" style="padding: 1.25rem;">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center gap-2">
+                            {% if rec.priority == "HIGH" %}
+                                <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                            {% else if rec.priority == "MEDIUM" %}
+                                <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            {% else %}
+                                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                            {% endif %}
+                            <span class="badge {% if rec.priority == 'HIGH' %}badge-danger{% else if rec.priority == 'MEDIUM' %}badge-warning{% else %}badge-info{% endif %}">
+                                {{ rec.priority }} PRIORITY
+                            </span>
+                        </div>
+                    </div>
+                    <h4 class="font-semibold text-lg mb-2">{{ rec.title }}</h4>
+                    <p class="text-gray-600 mb-3">{{ rec.description }}</p>
+                    <div class="grid grid-2 gap-4 text-sm">
+                        <div>
+                            <div class="font-medium text-green-600">Expected Impact</div>
+                            <div class="text-gray-600">{{ rec.impact }}</div>
+                        </div>
+                        <div>
+                            <div class="font-medium text-blue-600">Implementation Effort</div>
+                            <div class="text-gray-600">{{ rec.effort }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center text-gray-500 py-8">
+Excellent! No critical optimization opportunities detected.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Quick Actions</div>
+        <div class="card-subtitle">Common optimization tasks</div>
+    </div>
+    <div class="card-content">
+        <div class="grid grid-4">
+            <div class="metric-card">
+                <div class="metric-label">Memory Optimization</div>
+                <div class="metric-value text-lg">3</div>
+                <div class="metric-subtitle">jobs need tuning</div>
+            </div>
+            <div class="metric-card warning">
+                <div class="metric-label">Resource Quotas</div>
+                <div class="metric-value text-lg">2</div>
+                <div class="metric-subtitle">teams need limits</div>
+            </div>
+            <div class="metric-card success">
+                <div class="metric-label">Best Practices</div>
+                <div class="metric-value text-lg">1</div>
+                <div class="metric-subtitle">training session</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Hardware Planning</div>
+                <div class="metric-value text-lg">21</div>
+                <div class="metric-subtitle">days to scale</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Resource Waste Chart
+const wasteCtx = document.getElementById('wasteChart').getContext('2d');
+new Chart(wasteCtx, {
+    type: 'bar',
+    data: {
+        labels: ['ML Training', 'Daily ETL', 'Ad-hoc Queries', 'Analytics Jobs'],
+        datasets: [{
+            label: 'Weekly Waste ($)',
+            data: [8500, 3200, 4100, 1800],
+            backgroundColor: [
+                '#ef4444',
+                '#f59e0b', 
+                '#f97316',
+                '#eab308'
+            ],
+            borderRadius: 4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Team Efficiency Chart
+const efficiencyCtx = document.getElementById('efficiencyChart').getContext('2d');
+new Chart(efficiencyCtx, {
+    type: 'bar',
+    data: {
+        labels: ['Analytics', 'Data Eng', 'ML Platform', 'Ad-hoc'],
+        datasets: [{
+            label: 'Efficiency %',
+            data: [88, 72, 45, 34],
+            backgroundColor: function(context) {
+                const value = context.parsed.y;
+                if (value >= 80) return '#10b981';
+                if (value >= 60) return '#f59e0b';
+                return '#ef4444';
+            },
+            borderRadius: 4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                    callback: function(value) {
+                        return value + '%';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

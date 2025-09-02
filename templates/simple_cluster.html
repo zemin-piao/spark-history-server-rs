@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Analytics Dashboard</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; }
+        .card { background: white; padding: 1rem; margin: 1rem 0; border: 1px solid #ccc; }
+        .metrics { display: flex; gap: 1rem; }
+        .metric { text-align: center; padding: 1rem; background: #f5f5f5; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.5rem; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>Spark Analytics Dashboard</h1>
+    
+    <div class="card">
+        <h2>Cluster Capacity & Trends</h2>
+        <div class="metrics">
+            <div class="metric">
+                <h3>{{ cluster_stats.cpu_utilization }}%</h3>
+                <p>Current CPU</p>
+                <small>Peak today: {{ cluster_stats.peak_utilization_today }}%</small>
+            </div>
+            <div class="metric">
+                <h3>{{ cluster_stats.weekly_growth_rate }}</h3>
+                <p>Weekly Growth</p>
+                <small>Usage trending {{ cluster_stats.weekly_growth_rate }}</small>
+            </div>
+            <div class="metric">
+                <h3>{{ cluster_stats.projected_capacity_days }}</h3>
+                <p>Days to 95% Full</p>
+                <small>At current growth rate</small>
+            </div>
+            <div class="metric">
+                <h3>{{ cluster_stats.active_applications }}</h3>
+                <p>Active Jobs</p>
+                <small>{{ cluster_stats.total_cores }} total cores</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Team Resource Consumption (This Week)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Team</th>
+                    <th>CPU Hours</th>
+                    <th>% of Cluster</th>
+                    <th>Trend</th>
+                    <th>Efficiency</th>
+                    <th>Biggest Consumer</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in team_usage %}
+                <tr>
+                    <td><strong>{{ team.team }}</strong></td>
+                    <td>{{ team.cpu_hours_this_week }}</td>
+                    <td>{{ team.percentage_of_cluster }}%</td>
+                    <td>{{ team.week_over_week_change }}</td>
+                    <td>{{ team.efficiency_score }}%</td>
+                    <td>{{ team.top_resource_hog }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="card">
+        <h2>Active Applications</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Name</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for app in active_applications %}
+                <tr>
+                    <td>{{ app.id }}</td>
+                    <td>{{ app.user }}</td>
+                    <td>{{ app.name }}</td>
+                    <td>{{ app.duration }}</td>
+                    <td>{{ app.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <p><a href="/optimize">View Optimization Recommendations</a></p>
+</body>
+</html>

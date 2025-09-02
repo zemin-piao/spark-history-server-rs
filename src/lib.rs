@@ -1,6 +1,7 @@
 pub mod analytics_api;
 pub mod api;
 pub mod config;
+pub mod dashboard;
 pub mod event_processor;
 pub mod hdfs_reader;
 pub mod metadata_store;

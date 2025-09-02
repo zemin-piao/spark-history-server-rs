@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Job Optimization - Spark Analytics{% endblock %}
+
+{% block content %}
+<div class="filters">
+    <div class="filter-group">
+        <label>Analysis Period</label>
+        <select id="analysisRange">
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d" selected>Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Min Runtime (minutes)</label>
+        <input type="number" id="minRuntime" value="5" min="0" style="width: 80px;">
+    </div>
+</div>
+
+<!-- Top Optimization Targets -->
+<div class="card">
+    <h2>Top Resource Consumers (Last 7 Days)</h2>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Application</th>
+                    <th>User</th>
+                    <th>Runtime</th>
+                    <th>Peak Memory</th>
+                    <th>CPU-Hours</th>
+                    <th>Efficiency Score</th>
+                    <th>Optimization Potential</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in resource_hogs %}
+                <tr>
+                    <td>
+                        <a href="/api/v1/applications/{{ job.app_id }}" target="_blank" style="color: #3498db; text-decoration: none;">
+                            {{ job.name|truncate(30) }}
+                        </a>
+                    </td>
+                    <td>{{ job.user }}</td>
+                    <td>{{ job.runtime_hours }}h</td>
+                    <td>{{ job.peak_memory_gb }}GB</td>
+                    <td>{{ job.cpu_hours }}</td>
+                    <td>
+                        <span style="padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500; 
+                        {% if job.efficiency_score >= 80 %}background: #d4edda; color: #155724;{% else if job.efficiency_score >= 60 %}background: #fff3cd; color: #856404;{% else %}background: #f8d7da; color: #721c24;{% endif %}">
+                            {{ job.efficiency_score }}%
+                        </span>
+                    </td>
+                    <td>
+                        {{ job.optimization_potential }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #999; padding: 2rem;">No resource-heavy jobs found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Slowest Jobs -->
+<div class="card">
+    <h2>Slowest Jobs (Runtime vs Data Size)</h2>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Application</th>
+                    <th>User</th>
+                    <th>Runtime</th>
+                    <th>Input Data</th>
+                    <th>MB/sec Processed</th>
+                    <th>Similar Jobs Avg</th>
+                    <th>Performance Gap</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in slow_jobs %}
+                <tr>
+                    <td>
+                        <a href="/api/v1/applications/{{ job.app_id }}" target="_blank" style="color: #3498db; text-decoration: none;">
+                            {{ job.name|truncate(30) }}
+                        </a>
+                    </td>
+                    <td>{{ job.user }}</td>
+                    <td>{{ job.runtime_minutes }}min</td>
+                    <td>{{ job.input_data_gb }}GB</td>
+                    <td>{{ job.throughput_mb_sec }}</td>
+                    <td>{{ job.similar_jobs_avg_throughput }}</td>
+                    <td>
+                        <span style="color: #e74c3c; font-weight: bold;">
+                            {{ job.performance_gap }}x slower
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #999; padding: 2rem;">No slow jobs detected</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Failed Jobs Analysis -->
+<div class="card">
+    <h2>Most Common Failures</h2>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>User/Team</th>
+                    <th>Failure Count</th>
+                    <th>Most Common Error</th>
+                    <th>Avg Runtime Before Failure</th>
+                    <th>Resource Waste</th>
+                    <th>Action Needed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for failure in failure_patterns %}
+                <tr>
+                    <td>{{ failure.user }}</td>
+                    <td>
+                        <span style="background: #f8d7da; color: #721c24; padding: 0.25rem 0.75rem; border-radius: 12px; font-weight: bold;">
+                            {{ failure.failure_count }}
+                        </span>
+                    </td>
+                    <td>{{ failure.common_error|truncate(40) }}</td>
+                    <td>{{ failure.avg_runtime_before_failure }}min</td>
+                    <td>{{ failure.wasted_cpu_hours }}h CPU</td>
+                    <td>Investigate</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #999; padding: 2rem;">No recent failures</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Optimization Recommendations -->
+<div class="card">
+    <h2>Optimization Recommendations</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+        {% for rec in recommendations %}
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; border-left: 4px solid {% if rec.priority == 'HIGH' %}#e74c3c{% else if rec.priority == 'MEDIUM' %}#f39c12{% else %}#3498db{% endif %};">
+            <h4 style="color: #2c3e50; margin-bottom: 0.5rem;">
+                [{{ rec.priority }}] {{ rec.title }}
+            </h4>
+            <p style="color: #555; margin-bottom: 0.5rem;">{{ rec.description }}</p>
+            <div style="font-size: 0.85rem; color: #777;">
+                <strong>Impact:</strong> {{ rec.impact }} | <strong>Effort:</strong> {{ rec.effort }}
+            </div>
+        </div>
+        {% else %}
+        <div style="text-align: center; color: #999; padding: 2rem;">
+            🎉 No major optimization opportunities detected!
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+// Filter handlers
+document.getElementById('analysisRange').addEventListener('change', function() {
+    updateFilters();
+});
+
+document.getElementById('minRuntime').addEventListener('change', function() {
+    updateFilters();
+});
+
+function updateFilters() {
+    const range = document.getElementById('analysisRange').value;
+    const minRuntime = document.getElementById('minRuntime').value;
+    window.location.href = `/optimize?range=${range}&min_runtime=${minRuntime}`;
+}
+</script>
+{% endblock %}

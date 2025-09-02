@@ -11,6 +11,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 
 use crate::analytics_api;
+use crate::dashboard;
 use crate::models::{ApplicationInfo, ApplicationStatus, VersionInfo};
 use crate::storage::HistoryProvider;
 
@@ -47,6 +48,8 @@ pub async fn create_app(history_provider: HistoryProvider) -> anyhow::Result<Rou
         .route("/health", get(health_check))
         // Add analytics routes
         .nest("/api/v1", analytics_api::analytics_router())
+        // Add dashboard routes (web UI)
+        .nest("/", dashboard::dashboard_router())
         // Add middleware
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())

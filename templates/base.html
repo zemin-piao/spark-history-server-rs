@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Spark Analytics Dashboard{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .navbar {
+            background: #1a1a1a;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .navbar h1 {
+            display: inline-block;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .nav-links {
+            float: right;
+            list-style: none;
+        }
+        
+        .nav-links li {
+            display: inline-block;
+            margin-left: 2rem;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .nav-links a:hover, .nav-links a.active {
+            background: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-left: 4px solid #3498db;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-running { background: #d4edda; color: #155724; }
+        .status-succeeded { background: #cce5ff; color: #004085; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+        
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 20px;
+            margin: 0.5rem 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #28a745, #20c997);
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        .filters {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .filter-group {
+            display: inline-block;
+            margin-right: 1rem;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        select, input {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .navbar { padding: 1rem; }
+            .nav-links { float: none; margin-top: 1rem; }
+            .nav-links li { display: block; margin: 0.5rem 0; }
+            .container { padding: 0 1rem; }
+            .metrics-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Spark Analytics</h1>
+        <ul class="nav-links">
+            <li><a href="/" class="{% if active_tab == 'cluster' %}active{% endif %}">Cluster</a></li>
+            <li><a href="/resources" class="{% if active_tab == 'resources' %}active{% endif %}">Resources</a></li>
+            <li><a href="/optimize" class="{% if active_tab == 'optimize' %}active{% endif %}">Optimize</a></li>
+            <li><a href="/teams" class="{% if active_tab == 'teams' %}active{% endif %}">Teams</a></li>
+            <li><a href="/api/v1/applications" style="opacity: 0.7;">API</a></li>
+        </ul>
+        <div style="clear: both;"></div>
+    </nav>
+    
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    
+    <script>
+        // Auto-refresh every 30 seconds for real-time data
+        setTimeout(() => window.location.reload(), 30000);
+    </script>
+</body>
+</html>

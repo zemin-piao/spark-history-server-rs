@@ -1,0 +1,271 @@
+{% extends "modern_base.html" %}
+{% block title %}Cluster Overview - Spark Analytics Platform{% endblock %}
+
+{% block content %}
+<!-- Alert Bar -->
+{% if cluster_stats.projected_capacity_days < 30 %}
+<div class="alert alert-warning">
+    <div class="alert-title">⚠️ Capacity Alert</div>
+    Cluster will reach 95% capacity in {{ cluster_stats.projected_capacity_days }} days at current growth rate. Consider scaling up infrastructure.
+</div>
+{% endif %}
+
+<!-- Key Metrics Grid -->
+<div class="grid grid-4">
+    <div class="metric-card {% if cluster_stats.cpu_utilization > 80 %}danger{% else if cluster_stats.cpu_utilization > 70 %}warning{% endif %}">
+        <div class="metric-label">CPU Utilization</div>
+        <div class="metric-value">{{ cluster_stats.cpu_utilization }}%</div>
+        <div class="metric-subtitle">Peak today: {{ cluster_stats.peak_utilization_today }}%</div>
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-fill {% if cluster_stats.cpu_utilization > 80 %}danger{% else if cluster_stats.cpu_utilization > 70 %}warning{% endif %}" style="width: {{ cluster_stats.cpu_utilization }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="metric-card {% if cluster_stats.weekly_growth_rate.starts_with('+') %}warning{% else %}success{% endif %}">
+        <div class="metric-label">Weekly Growth</div>
+        <div class="metric-value">{{ cluster_stats.weekly_growth_rate }}</div>
+        <div class="metric-subtitle">Resource demand trend</div>
+    </div>
+
+    <div class="metric-card {% if cluster_stats.projected_capacity_days < 15 %}danger{% else if cluster_stats.projected_capacity_days < 30 %}warning{% else %}success{% endif %}">
+        <div class="metric-label">Runway</div>
+        <div class="metric-value">{{ cluster_stats.projected_capacity_days }}</div>
+        <div class="metric-subtitle">Days to 95% capacity</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-label">Active Jobs</div>
+        <div class="metric-value">{{ cluster_stats.active_applications }}</div>
+        <div class="metric-subtitle">{{ cluster_stats.total_cores }} total cores</div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Resource Utilization Trend</div>
+            <div class="card-subtitle">Last 7 days CPU and Memory usage</div>
+        </div>
+        <div class="card-content">
+            <div class="chart-container">
+                <canvas id="utilizationChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Team Resource Distribution</div>
+            <div class="card-subtitle">Current week consumption by team</div>
+        </div>
+        <div class="card-content">
+            <div class="chart-container">
+                <canvas id="teamDistributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Team Resource Consumption Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Team Performance Dashboard</div>
+        <div class="card-subtitle">Resource consumption and efficiency metrics by team</div>
+    </div>
+    <div class="card-content">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>CPU Hours</th>
+                        <th>Cluster Share</th>
+                        <th>Trend</th>
+                        <th>Efficiency</th>
+                        <th>Top Consumer</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in team_usage %}
+                    <tr>
+                        <td>
+                            <div class="font-semibold">{{ team.team }}</div>
+                        </td>
+                        <td>
+                            <div class="font-medium">{{ team.cpu_hours_this_week }}</div>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium">{{ team.percentage_of_cluster }}%</span>
+                                <div class="progress-bar" style="width: 60px; height: 4px;">
+                                    <div class="progress-fill" style="width: {{ team.percentage_of_cluster }}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge {% if team.week_over_week_change.starts_with('+') %}badge-warning{% else %}badge-success{% endif %}">
+                                {{ team.week_over_week_change }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium {% if team.efficiency_score >= 80 %}text-green-600{% else if team.efficiency_score >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ team.efficiency_score }}%</span>
+                                <div class="progress-bar" style="width: 40px; height: 4px;">
+                                    <div class="progress-fill {% if team.efficiency_score >= 80 %}{% else if team.efficiency_score >= 60 %}warning{% else %}danger{% endif %}" style="width: {{ team.efficiency_score }}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-sm text-gray-600">{{ team.top_resource_hog }}</div>
+                        </td>
+                        <td>
+                            {% if team.efficiency_score < 50 %}
+                                <span class="badge badge-danger">Needs Review</span>
+                            {% else if team.efficiency_score < 70 %}
+                                <span class="badge badge-warning">Monitor</span>
+                            {% else %}
+                                <span class="badge badge-success">Healthy</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Active Applications -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Currently Running Applications</div>
+        <div class="card-subtitle">Real-time job monitoring</div>
+    </div>
+    <div class="card-content">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Application ID</th>
+                        <th>User</th>
+                        <th>Name</th>
+                        <th>Runtime</th>
+                        <th>Resources</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in active_applications %}
+                    <tr>
+                        <td>
+                            <a href="/api/v1/applications/{{ app.id }}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium">
+                                {{ app.id }}
+                            </a>
+                        </td>
+                        <td>{{ app.user }}</td>
+                        <td>
+                            <div class="font-medium">{{ app.name }}</div>
+                        </td>
+                        <td>{{ app.duration }}</td>
+                        <td>
+                            <div class="text-sm">
+                                <div>{{ app.cores }} cores</div>
+                                <div class="text-gray-500">{{ app.memory }}GB RAM</div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge {% if app.status == 'RUNNING' %}badge-info{% else if app.status == 'SUCCEEDED' %}badge-success{% else %}badge-danger{% endif %}">
+                                {{ app.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-gray-500 py-8">No active applications</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Utilization Trend Chart
+const ctx1 = document.getElementById('utilizationChart').getContext('2d');
+new Chart(ctx1, {
+    type: 'line',
+    data: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        datasets: [{
+            label: 'CPU %',
+            data: [65, 72, 89, 76, 68, 45, 52],
+            borderColor: '#0066cc',
+            backgroundColor: 'rgba(0, 102, 204, 0.1)',
+            tension: 0.4,
+            fill: true
+        }, {
+            label: 'Memory %',
+            data: [58, 63, 71, 68, 62, 41, 47],
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                    callback: function(value) {
+                        return value + '%';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Team Distribution Chart
+const ctx2 = document.getElementById('teamDistributionChart').getContext('2d');
+new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+        labels: ['Data Engineering', 'ML Platform', 'Analytics', 'Ad-hoc Queries'],
+        datasets: [{
+            data: [45, 31, 16, 8],
+            backgroundColor: [
+                '#0066cc',
+                '#10b981', 
+                '#f59e0b',
+                '#ef4444'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

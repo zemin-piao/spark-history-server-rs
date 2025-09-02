@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Performance Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0066cc;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-600: #4b5563;
+            --gray-900: #111827;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .card {
+            background: white;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--gray-900);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th {
+            background: var(--gray-100);
+            padding: 1rem 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--gray-900);
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        td {
+            padding: 0.875rem 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+        }
+        
+        tr:hover {
+            background: var(--gray-50);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-info {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .font-mono { font-family: 'Courier New', monospace; }
+        .text-right { text-align: right; }
+        
+        @media (max-width: 768px) {
+            .container { padding: 0 1rem; }
+            .header { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Spark Performance Analytics</h1>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Performance Trends</h2>
+            {% if performance_trends.is_empty() %}
+            <p style="color: var(--gray-600); text-align: center; padding: 2rem;">
+                No performance data available. Make sure Spark applications are running and event logs are being processed.
+            </p>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Application ID</th>
+                        <th>Tasks</th>
+                        <th>Failed Tasks</th>
+                        <th>Avg Duration</th>
+                        <th>Avg Input (MB)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trend in performance_trends %}
+                    <tr>
+                        <td>{{ trend.date }}</td>
+                        <td class="font-mono">{{ trend.app_id }}</td>
+                        <td class="text-right">{{ trend.total_tasks }}</td>
+                        <td class="text-right">
+                            {% if trend.failed_tasks > 0 %}
+                                <span class="badge badge-warning">{{ trend.failed_tasks }}</span>
+                            {% else %}
+                                0
+                            {% endif %}
+                        </td>
+                        <td class="text-right">{{ trend.avg_task_duration_ms }}ms</td>
+                        <td class="text-right">{{ trend.avg_input_bytes }}MB</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        
+        <div class="card">
+            <h2>Resource Utilization</h2>
+            {% if resource_utilization.is_empty() %}
+            <p style="color: var(--gray-600); text-align: center; padding: 2rem;">
+                No resource utilization data available.
+            </p>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Application</th>
+                        <th>Executor</th>
+                        <th>Host</th>
+                        <th>Tasks</th>
+                        <th>Duration</th>
+                        <th>Memory (MB)</th>
+                        <th>I/O (MB)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric in resource_utilization %}
+                    <tr>
+                        <td class="font-mono">{{ metric.app_name }}</td>
+                        <td class="font-mono">{{ metric.executor_id }}</td>
+                        <td>{{ metric.host }}</td>
+                        <td class="text-right">{{ metric.total_tasks }}</td>
+                        <td class="text-right">{{ metric.total_duration_ms }}ms</td>
+                        <td class="text-right">
+{{ metric.peak_memory_usage_mb }}
+                        </td>
+                        <td class="text-right">{{ metric.input_bytes }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        
+        <div class="card">
+            <h2>Task Distribution</h2>
+            {% if task_distribution.is_empty() %}
+            <p style="color: var(--gray-600); text-align: center; padding: 2rem;">
+                No task distribution data available.
+            </p>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Application</th>
+                        <th>Stage</th>
+                        <th>Total Tasks</th>
+                        <th>Completed</th>
+                        <th>Failed</th>
+                        <th>Avg Duration</th>
+                        <th>Data Locality</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dist in task_distribution %}
+                    <tr>
+                        <td class="font-mono">{{ dist.app_id }}</td>
+                        <td class="text-right">{{ dist.stage_id }}</td>
+                        <td class="text-right">{{ dist.total_tasks }}</td>
+                        <td class="text-right">
+                            <span class="badge badge-success">{{ dist.completed_tasks }}</span>
+                        </td>
+                        <td class="text-right">
+                            {% if dist.failed_tasks > 0 %}
+                                <span class="badge badge-warning">{{ dist.failed_tasks }}</span>
+                            {% else %}
+                                0
+                            {% endif %}
+                        </td>
+                        <td class="text-right">{{ dist.avg_duration_ms }}ms</td>
+                        <td class="text-right">
+                            <span class="badge badge-info">{{ dist.data_locality_summary.process_local }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        
+        <p style="text-align: center; margin-top: 2rem;">
+            <a href="/" style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                ← Back to Cluster Overview
+            </a>
+        </p>
+    </div>
+</body>
+</html>

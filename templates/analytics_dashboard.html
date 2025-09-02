@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Analytics Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #0066cc;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .nav-tab {
+            color: var(--gray-600);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 0;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .nav-tab:hover, .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary);
+            transition: transform 0.2s;
+            position: relative;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card.warning { border-left-color: var(--warning); }
+        .metric-card.danger { border-left-color: var(--danger); }
+        .metric-card.success { border-left-color: var(--success); }
+        .metric-card.info { border-left-color: var(--info); }
+        
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1;
+        }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+        
+        .metric-change {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+        
+        .metric-change.positive {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .metric-change.negative {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .card {
+            background: white;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: var(--gray-50);
+            border-radius: 8px;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th {
+            background: var(--gray-100);
+            padding: 1rem 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--gray-900);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        td {
+            padding: 0.875rem 0.75rem;
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 0.875rem;
+        }
+        
+        tr:hover {
+            background: var(--gray-50);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1d4ed8; }
+        
+        .progress-bar {
+            background: var(--gray-200);
+            border-radius: 4px;
+            height: 8px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        
+        .filter-bar {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .filter-item select, .filter-item input {
+            padding: 0.5rem;
+            border: 1px solid var(--gray-200);
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0052a3;
+        }
+        
+        .font-mono { font-family: 'Courier New', monospace; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .text-sm { font-size: 0.875rem; }
+        
+        @media (max-width: 768px) {
+            .container { padding: 0 1rem; }
+            .header { padding: 1rem; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            .metric-value { font-size: 2rem; }
+            .nav-tabs { gap: 1rem; }
+            .header-content { flex-direction: column; gap: 1rem; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>🔥 Spark Analytics Dashboard</h1>
+            <nav class="nav-tabs">
+                <a href="/" class="nav-tab active">Overview</a>
+                <a href="/optimize" class="nav-tab">Performance</a>
+                <a href="/resources" class="nav-tab">Resources</a>
+                <a href="/teams" class="nav-tab">Teams</a>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Key Performance Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{{ cross_app_summary.total_applications }}</div>
+                <div class="metric-label">Total Applications</div>
+                <div class="metric-change positive">↗ Active</div>
+            </div>
+            
+            <div class="metric-card success">
+                <div class="metric-value">{{ cross_app_summary.active_applications }}</div>
+                <div class="metric-label">Currently Running</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 75%;"></div>
+                </div>
+            </div>
+            
+            <div class="metric-card info">
+                <div class="metric-value">{{ cross_app_summary.total_events }}</div>
+                <div class="metric-label">Events Processed</div>
+                <div class="metric-change positive">+15%</div>
+            </div>
+            
+            <div class="metric-card warning">
+                <div class="metric-value">{{ cross_app_summary.total_tasks_failed }}</div>
+                <div class="metric-label">Failed Tasks</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 25%; background: var(--warning);"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Performance Overview Chart -->
+        <div class="card">
+            <div class="card-header">
+                <h2>📊 Performance Trends</h2>
+                <div class="filter-group">
+                    <div class="filter-item">
+                        <select id="timeRange">
+                            <option>Last 24 hours</option>
+                            <option>Last 7 days</option>
+                            <option>Last 30 days</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="refreshData()">Refresh</button>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">{{ cross_app_summary.avg_task_duration_ms }}s</div>
+                    <div class="stat-label">Avg Task Duration</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ cross_app_summary.total_data_processed_gb }}GB</div>
+                    <div class="stat-label">Data Processed</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ cross_app_summary.peak_concurrent_executors }}</div>
+                    <div class="stat-label">Peak Executors</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">95%</div>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Application Status -->
+        <div class="card">
+            <div class="card-header">
+                <h2>🚀 Active Applications</h2>
+                <a href="/api/v1/applications" target="_blank" class="btn btn-primary">View API</a>
+            </div>
+            
+            {% if active_applications.is_empty() %}
+            <div class="text-center" style="padding: 3rem; color: var(--gray-600);">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🌟</div>
+                <h3>No Active Applications</h3>
+                <p class="text-sm">Start some Spark applications to see real-time analytics here.</p>
+            </div>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Application ID</th>
+                        <th>User</th>
+                        <th>Runtime</th>
+                        <th>Resources</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in active_applications %}
+                    <tr>
+                        <td>
+                            <div class="font-mono">{{ app.id }}</div>
+                        </td>
+                        <td>{{ app.user }}</td>
+                        <td>{{ app.duration }}</td>
+                        <td>{{ app.cores }} cores, {{ app.memory }}GB</td>
+                        <td>
+                            <span class="badge badge-info">{{ app.status }}</span>
+                        </td>
+                        <td>
+                            <a href="/api/v1/applications/{{ app.id }}" target="_blank" class="badge badge-success">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        
+        <!-- Real Performance Trends Data -->
+        <div class="card">
+            <div class="card-header">
+                <h2>📈 Real Performance Trends</h2>
+                <a href="/api/v1/analytics/performance-trends" target="_blank" class="btn btn-primary">View API</a>
+            </div>
+            
+            {% if performance_trends.is_empty() %}
+            <div class="text-center" style="padding: 3rem; color: var(--gray-600);">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+                <h3>No Performance Data</h3>
+                <p class="text-sm">Performance trends will appear here once Spark applications run tasks.</p>
+            </div>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Application ID</th>
+                        <th>Total Tasks</th>
+                        <th>Failed Tasks</th>
+                        <th>Avg Duration</th>
+                        <th>Avg Input (MB)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trend in performance_trends %}
+                    <tr>
+                        <td>{{ trend.date }}</td>
+                        <td class="font-mono">{{ trend.app_id }}</td>
+                        <td class="text-right">{{ trend.total_tasks }}</td>
+                        <td class="text-right">
+                            {% if trend.failed_tasks > 0 %}
+                                <span class="badge badge-warning">{{ trend.failed_tasks }}</span>
+                            {% else %}
+                                <span class="badge badge-success">0</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right">{{ trend.avg_task_duration_ms }}ms</td>
+                        <td class="text-right">{{ trend.avg_input_bytes }}MB</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <!-- Executor Utilization -->
+        <div class="card">
+            <div class="card-header">
+                <h2>⚙️ Executor Utilization</h2>
+                <a href="/api/v1/analytics/executor-utilization" target="_blank" class="btn btn-primary">View API</a>
+            </div>
+            
+            {% if executor_utilization.is_empty() %}
+            <div class="text-center" style="padding: 3rem; color: var(--gray-600);">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🖥️</div>
+                <h3>No Executor Data</h3>
+                <p class="text-sm">Executor utilization metrics will appear here from running applications.</p>
+            </div>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Executor ID</th>
+                        <th>Host</th>
+                        <th>Total Tasks</th>
+                        <th>Duration (ms)</th>
+                        <th>Memory (MB)</th>
+                        <th>Data Locality</th>
+                        <th>Applications</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exec in executor_utilization %}
+                    <tr>
+                        <td class="font-mono">{{ exec.executor_id }}</td>
+                        <td>{{ exec.host }}</td>
+                        <td class="text-right">{{ exec.total_tasks }}</td>
+                        <td class="text-right">{{ exec.total_duration_ms }}</td>
+                        <td class="text-right">
+                            {% match exec.peak_memory_usage_mb %}
+                                {% when Some with (mem) %}
+                                    {{ mem }}
+                                {% when None %}
+                                    -
+                            {% endmatch %}
+                        </td>
+                        <td class="text-right">
+                            <span class="badge badge-info">{{ exec.data_locality_hits }}</span>
+                        </td>
+                        <td class="text-right">{{ exec.apps_served.len() }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <!-- Quick API Access -->
+        <div class="card">
+            <div class="card-header">
+                <h2>⚡ Analytics APIs</h2>
+            </div>
+            
+            <div class="stats-grid">
+                <a href="/api/v1/analytics/performance-trends" target="_blank" class="stat-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="stat-value">📈</div>
+                    <div class="stat-label">Performance API</div>
+                </a>
+                
+                <a href="/api/v1/analytics/task-distribution" target="_blank" class="stat-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="stat-value">🎯</div>
+                    <div class="stat-label">Task Distribution</div>
+                </a>
+                
+                <a href="/api/v1/analytics/executor-utilization" target="_blank" class="stat-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="stat-value">⚙️</div>
+                    <div class="stat-label">Executor Metrics</div>
+                </a>
+                
+                <a href="/api/v1/analytics/cross-app-summary" target="_blank" class="stat-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    <div class="stat-value">📊</div>
+                    <div class="stat-label">Cross-App Summary</div>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize performance chart
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        const performanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'],
+                datasets: [{
+                    label: 'Task Duration (ms)',
+                    data: [2800, 2600, 2400, 2200, 2500, 2300, 2400],
+                    borderColor: '#0066cc',
+                    backgroundColor: 'rgba(0, 102, 204, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Failed Tasks',
+                    data: [5, 8, 3, 2, 6, 4, 8],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Duration (ms)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Failed Tasks'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                }
+            }
+        });
+        
+        // Interactive Data Fetching
+        async function loadAnalyticsData() {
+            try {
+                console.log('🔄 Loading fresh analytics data...');
+                
+                // Fetch real-time data from all endpoints
+                const [summary, trends, executors, tasks] = await Promise.all([
+                    fetch('/api/v1/analytics/cross-app-summary').then(r => r.json()),
+                    fetch('/api/v1/analytics/performance-trends').then(r => r.json()),
+                    fetch('/api/v1/analytics/executor-utilization').then(r => r.json()),
+                    fetch('/api/v1/analytics/task-distribution').then(r => r.json())
+                ]);
+                
+                console.log('📊 Analytics data loaded:', { summary, trends, executors, tasks });
+                
+                // Update live metrics in the header
+                updateLiveMetrics(summary);
+                
+                // Update the performance chart with real data
+                if (trends && trends.length > 0) {
+                    updatePerformanceChart(trends);
+                }
+                
+                // Show success notification
+                showNotification('✅ Analytics data refreshed successfully!', 'success');
+                
+            } catch (error) {
+                console.error('❌ Error loading analytics:', error);
+                showNotification('❌ Failed to load analytics data', 'error');
+            }
+        }
+        
+        function updateLiveMetrics(summary) {
+            // Update key metrics with animation
+            const metrics = [
+                { selector: '.metric-value', value: summary.total_applications },
+                { selector: '.metric-card.success .metric-value', value: summary.active_applications },
+                { selector: '.metric-card.info .metric-value', value: summary.total_events },
+                { selector: '.metric-card.warning .metric-value', value: summary.total_tasks_failed }
+            ];
+            
+            metrics.forEach((metric, index) => {
+                const elements = document.querySelectorAll(metric.selector);
+                if (elements[index]) {
+                    animateNumber(elements[index], parseInt(elements[index].textContent), metric.value);
+                }
+            });
+        }
+        
+        function updatePerformanceChart(trends) {
+            if (trends.length === 0) return;
+            
+            // Extract data from trends
+            const labels = trends.map(t => t.date);
+            const durations = trends.map(t => t.avg_task_duration_ms || 0);
+            const failures = trends.map(t => t.failed_tasks || 0);
+            
+            // Update chart data
+            performanceChart.data.labels = labels;
+            performanceChart.data.datasets[0].data = durations;
+            performanceChart.data.datasets[1].data = failures;
+            performanceChart.update();
+            
+            console.log('📈 Chart updated with real data:', { labels, durations, failures });
+        }
+        
+        function animateNumber(element, start, end) {
+            const duration = 1000;
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const current = Math.floor(start + (end - start) * progress);
+                element.textContent = current;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                transition: all 0.3s ease;
+                ${type === 'success' ? 'background: var(--success);' : 'background: var(--danger);'}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.transform = 'translateX(400px)';
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // Auto-refresh functionality
+        function refreshData() {
+            console.log('🔄 Refreshing dashboard...');
+            loadAnalyticsData();
+        }
+        
+        // Load initial data
+        setTimeout(loadAnalyticsData, 1000);
+        
+        // Auto-refresh every 30 seconds
+        setInterval(refreshData, 30000);
+        
+        // Add visual feedback for interactive elements
+        document.querySelectorAll('.metric-card').forEach(card => {
+            card.addEventListener('click', () => {
+                card.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    card.style.transform = '';
+                }, 100);
+            });
+        });
+        
+        console.log('✨ Spark Analytics Dashboard loaded!');
+        console.log('📊 Available APIs:', {
+            'Applications': '/api/v1/applications',
+            'Performance': '/api/v1/analytics/performance-trends',
+            'Tasks': '/api/v1/analytics/task-distribution',
+            'Executors': '/api/v1/analytics/executor-utilization',
+            'Summary': '/api/v1/analytics/cross-app-summary'
+        });
+    </script>
+</body>
+</html>

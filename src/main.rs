@@ -7,6 +7,7 @@ use tracing_subscriber::FmtSubscriber;
 mod analytics_api;
 mod api;
 mod config;
+mod dashboard;
 mod models;
 mod storage;
 
