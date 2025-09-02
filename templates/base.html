@@ -190,11 +190,12 @@
     <nav class="navbar">
         <h1>Spark Analytics</h1>
         <ul class="nav-links">
-            <li><a href="/" class="{% if active_tab == 'cluster' %}active{% endif %}">Cluster</a></li>
+            <li><a href="/" class="{% if active_tab == 'cluster' %}active{% endif %}">Overview</a></li>
+            <li><a href="/analytics" class="{% if active_tab == 'analytics' %}active{% endif %}">Analytics</a></li>
             <li><a href="/resources" class="{% if active_tab == 'resources' %}active{% endif %}">Resources</a></li>
             <li><a href="/optimize" class="{% if active_tab == 'optimize' %}active{% endif %}">Optimize</a></li>
             <li><a href="/teams" class="{% if active_tab == 'teams' %}active{% endif %}">Teams</a></li>
-            <li><a href="/api/v1/applications" style="opacity: 0.7;">API</a></li>
+            <li><a href="/api/v1/applications" style="opacity: 0.7;" target="_blank">API</a></li>
         </ul>
         <div style="clear: both;"></div>
     </nav>
