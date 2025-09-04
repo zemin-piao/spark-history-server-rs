@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Spark Analytics Platform{% endblock %}</title>
+    <title>{% block title %}Spark Platform{% endblock %}</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -400,10 +400,9 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <div class="logo">Spark Analytics Platform</div>
+            <div class="logo">Spark Platform</div>
             <nav class="nav">
                 <a href="/" class="nav-link {% if active_tab == 'cluster' %}active{% endif %}">Overview</a>
-                <a href="/analytics" class="nav-link {% if active_tab == 'analytics' %}active{% endif %}">Analytics</a>
                 <a href="/resources" class="nav-link {% if active_tab == 'resources' %}active{% endif %}">Resources</a>
                 <a href="/optimize" class="nav-link {% if active_tab == 'optimize' %}active{% endif %}">Optimize</a>
                 <a href="/teams" class="nav-link {% if active_tab == 'teams' %}active{% endif %}">Teams</a>

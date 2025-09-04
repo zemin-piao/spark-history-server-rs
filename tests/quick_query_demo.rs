@@ -124,7 +124,7 @@ async fn test_quick_analytical_query_demo() {
         app_id: None,
         limit: Some(20),
     };
-    let trends = store.get_performance_trends(&params).await.unwrap();
+    let trends = store.get_capacity_usage_trends(&params).await.unwrap();
     let query_time = query_start.elapsed();
     println!("{} trends in {:.0}ms", trends.len(), query_time.as_millis());
 
@@ -137,7 +137,7 @@ async fn test_quick_analytical_query_demo() {
         app_id: None,
         limit: Some(15),
     };
-    let distribution = store.get_task_distribution(&params).await.unwrap();
+    let distribution = store.get_efficiency_analysis(&params).await.unwrap();
     let query_time = query_start.elapsed();
     println!(
         "{} distributions in {:.0}ms",

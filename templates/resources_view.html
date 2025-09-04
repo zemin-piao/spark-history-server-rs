@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resources - Spark Analytics</title>
+    <title>Resources - Spark Platform</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -428,10 +428,9 @@
 <body>
     <div class="header">
         <div class="header-content">
-            <h1>🔥 Spark Analytics Platform</h1>
+            <h1>🔥 Spark Platform</h1>
             <nav class="nav-tabs">
                 <a href="/" class="nav-tab">Overview</a>
-                <a href="/analytics" class="nav-tab">Analytics</a>
                 <a href="/resources" class="nav-tab active">Resources</a>
                 <a href="/optimize" class="nav-tab">Optimize</a>
                 <a href="/teams" class="nav-tab">Teams</a>
@@ -521,7 +520,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2>📈 Resource Utilization Trends</h2>
-                    <a href="/api/v1/analytics/resource-utilization" target="_blank" class="btn btn-primary">View API</a>
+                    <a href="/api/v1/optimization/resource-hogs" target="_blank" class="btn btn-primary">View API</a>
                 </div>
                 <div class="chart-container">
                     <canvas id="resourceTrendChart"></canvas>
@@ -750,19 +749,19 @@
             </div>
             
             <div class="resource-grid">
-                <a href="/api/v1/analytics/resource-utilization" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <a href="/api/v1/optimization/resource-hogs" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                     <div class="resource-name">Resource Utilization</div>
                     <div class="resource-value">📊</div>
                     <div class="text-xs text-gray-600">Detailed executor metrics</div>
                 </a>
                 
-                <a href="/api/v1/analytics/resource-usage" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <a href="/api/v1/optimization/efficiency-analysis" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                     <div class="resource-name">Resource Usage</div>
                     <div class="resource-value">💾</div>
                     <div class="text-xs text-gray-600">Usage summary data</div>
                 </a>
                 
-                <a href="/api/v1/analytics/executor-utilization" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <a href="/api/v1/capacity/usage-trends" target="_blank" class="resource-item" style="text-decoration: none; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                     <div class="resource-name">Executor Stats</div>
                     <div class="resource-value">⚙️</div>
                     <div class="text-xs text-gray-600">Per-executor statistics</div>
@@ -957,7 +956,7 @@
         async function refreshData() {
             console.log('🔄 Refreshing resource data...');
             try {
-                const response = await fetch('/api/v1/analytics/resource-utilization');
+                const response = await fetch('/api/v1/optimization/resource-hogs');
                 const data = await response.json();
                 console.log('📊 Resource data loaded:', data);
                 // TODO: Update charts with new data

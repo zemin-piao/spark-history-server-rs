@@ -193,8 +193,8 @@ impl ComprehensiveBenchmark {
                 limit: Some(20),
             };
 
-            let _trends = store.get_performance_trends(&params).await?;
-            let _summary = store.get_cross_app_summary(&params).await?;
+            let _trends = store.get_capacity_usage_trends(&params).await?;
+            let _summary = store.get_cross_app_summary().await?;
         }
 
         let duration = start_time.elapsed();

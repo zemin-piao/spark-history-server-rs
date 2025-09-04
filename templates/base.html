@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Spark Analytics Dashboard{% endblock %}</title>
+    <title>{% block title %}Spark Platform Dashboard{% endblock %}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -188,10 +188,9 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1>Spark Analytics</h1>
+        <h1>Spark Platform</h1>
         <ul class="nav-links">
             <li><a href="/" class="{% if active_tab == 'cluster' %}active{% endif %}">Overview</a></li>
-            <li><a href="/analytics" class="{% if active_tab == 'analytics' %}active{% endif %}">Analytics</a></li>
             <li><a href="/resources" class="{% if active_tab == 'resources' %}active{% endif %}">Resources</a></li>
             <li><a href="/optimize" class="{% if active_tab == 'optimize' %}active{% endif %}">Optimize</a></li>
             <li><a href="/teams" class="{% if active_tab == 'teams' %}active{% endif %}">Teams</a></li>

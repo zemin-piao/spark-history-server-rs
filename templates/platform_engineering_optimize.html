@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Optimization Dashboard - Spark Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #0066cc;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .nav-tab {
+            color: var(--gray-600);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 0;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .nav-tab:hover, .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        /* Platform Engineering Dashboard Styles */
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary) 0%, #0052a3 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .dashboard-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .dashboard-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .summary-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary);
+            transition: transform 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 102, 204, 0.1);
+            border-radius: 50%;
+            transform: translate(20px, -20px);
+        }
+        
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        .summary-card.warning { border-left-color: var(--warning); }
+        .summary-card.danger { border-left-color: var(--danger); }
+        .summary-card.success { border-left-color: var(--success); }
+        .summary-card.info { border-left-color: var(--info); }
+        
+        .summary-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1;
+        }
+        
+        .summary-label {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        .summary-icon {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.5rem;
+            opacity: 0.7;
+        }
+        
+        .section {
+            background: white;
+            padding: 2rem;
+            margin: 2rem 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .section h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .section-description {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.875rem;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0052a3;
+        }
+
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-200);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-200);
+        }
+        
+        /* Resource Hogs Table */
+        .resource-hogs-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .resource-hog-item {
+            background: var(--gray-50);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--danger);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+
+        .resource-hog-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .resource-hog-info {
+            flex-grow: 1;
+        }
+
+        .resource-hog-app {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+
+        .resource-hog-details {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.875rem;
+            color: var(--gray-600);
+        }
+
+        .resource-hog-metric {
+            background: white;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .resource-hog-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--danger);
+            line-height: 1;
+        }
+
+        .resource-hog-unit {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+        }
+        
+        /* Efficiency Analysis */
+        .efficiency-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+
+        .efficiency-card {
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 1.25rem;
+            background: white;
+            transition: transform 0.2s;
+        }
+
+        .efficiency-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .efficiency-card.over-provisioned {
+            border-left: 4px solid var(--warning);
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        }
+
+        .efficiency-card.under-provisioned {
+            border-left: 4px solid var(--danger);
+            background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%);
+        }
+
+        .efficiency-card.well-tuned {
+            border-left: 4px solid var(--success);
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        }
+
+        .efficiency-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .efficiency-app-name {
+            font-weight: 600;
+            color: var(--gray-900);
+            font-size: 1rem;
+        }
+
+        .efficiency-category {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .efficiency-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .efficiency-metric {
+            text-align: center;
+            background: rgba(255,255,255,0.7);
+            padding: 0.75rem;
+            border-radius: 6px;
+        }
+
+        .efficiency-metric-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .efficiency-metric-label {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+        }
+
+        .efficiency-actions {
+            background: rgba(255,255,255,0.8);
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+        }
+
+        .efficiency-actions h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--gray-900);
+        }
+
+        .efficiency-actions ul {
+            list-style: none;
+            font-size: 0.8rem;
+            color: var(--gray-700);
+        }
+
+        .efficiency-actions li {
+            margin-bottom: 0.25rem;
+            position: relative;
+            padding-left: 1rem;
+        }
+
+        .efficiency-actions li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* Cost Optimization */
+        .cost-optimization-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .cost-item {
+            display: flex;
+            align-items: center;
+            background: var(--gray-50);
+            padding: 1.25rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--success);
+        }
+
+        .cost-item-info {
+            flex-grow: 1;
+        }
+
+        .cost-item-app {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .cost-item-details {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+        }
+
+        .cost-item-savings {
+            text-align: right;
+            padding: 0 1rem;
+        }
+
+        .cost-savings-amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--success);
+            line-height: 1;
+        }
+
+        .cost-savings-percent {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+        }
+
+        .cost-confidence {
+            background: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-align: center;
+            min-width: 80px;
+        }
+
+        .cost-confidence-score {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .cost-confidence-label {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+        }
+
+        /* Capacity Trends Chart */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 1rem 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--gray-600);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1d4ed8; }
+
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        .font-mono { font-family: 'Courier New', monospace; }
+
+        @media (max-width: 768px) {
+            .container { padding: 0 1rem; }
+            .header { padding: 1rem; }
+            .summary-grid { grid-template-columns: 1fr; }
+            .efficiency-grid { grid-template-columns: 1fr; }
+            .summary-value { font-size: 2rem; }
+            .dashboard-title { font-size: 1.5rem; }
+            .nav-tabs { gap: 1rem; }
+            .header-content { flex-direction: column; gap: 1rem; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>🚀 Spark Platform</h1>
+            <nav class="nav-tabs">
+                <a href="/" class="nav-tab">Overview</a>
+                <a href="/resources" class="nav-tab">Resources</a>
+                <a href="/optimize" class="nav-tab active">Optimize</a>
+                <a href="/teams" class="nav-tab">Teams</a>
+                <a href="/api/v1/applications" class="nav-tab" target="_blank" style="opacity: 0.7;">API</a>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Platform Engineering Dashboard Header -->
+        <div class="dashboard-header">
+            <div class="dashboard-title">💰 Resource Optimization Dashboard</div>
+            <div class="dashboard-subtitle">Identify resource waste, optimize costs, and improve platform efficiency</div>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="summary-grid">
+            <div class="summary-card danger">
+                <div class="summary-icon">🔥</div>
+                <div class="summary-value">{{ summary_stats.total_resource_hogs }}</div>
+                <div class="summary-label">Resource Hogs Found</div>
+            </div>
+            
+            <div class="summary-card warning">
+                <div class="summary-icon">📊</div>
+                <div class="summary-value">{{ summary_stats.over_provisioned_apps }}</div>
+                <div class="summary-label">Over-Provisioned Apps</div>
+            </div>
+            
+            <div class="summary-card info">
+                <div class="summary-icon">⚡</div>
+                <div class="summary-value">{{ summary_stats.under_provisioned_apps }}</div>
+                <div class="summary-label">Under-Provisioned Apps</div>
+            </div>
+            
+            <div class="summary-card success">
+                <div class="summary-icon">💰</div>
+                <div class="summary-value">{{ summary_stats.potential_monthly_savings }}</div>
+                <div class="summary-label">Potential Monthly Savings</div>
+            </div>
+            
+            <div class="summary-card">
+                <div class="summary-icon">🎯</div>
+                <div class="summary-value">{{ summary_stats.apps_needing_optimization }}</div>
+                <div class="summary-label">Apps Need Optimization</div>
+            </div>
+            
+            <div class="summary-card">
+                <div class="summary-icon">✅</div>
+                <div class="summary-value">{{ summary_stats.high_confidence_optimizations }}</div>
+                <div class="summary-label">High Confidence Actions</div>
+            </div>
+        </div>
+
+        <!-- TOP Resource Hogs -->
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <h2>🔥 TOP Resource Consumers</h2>
+                    <div class="section-description">Applications consuming the most memory, CPU, and disk resources</div>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <select id="resourceHogsFilter" onchange="filterResourceHogs()" class="btn btn-secondary" style="padding: 0.5rem;">
+                        <option value="all">Show All ({{ resource_hogs.len() }})</option>
+                        <option value="3" selected>Top 3 Worst</option>
+                        <option value="5">Top 5 Worst</option>
+                        <option value="10">Top 10 Worst</option>
+                    </select>
+                    <a href="/api/v1/optimization/resource-hogs" target="_blank" class="btn btn-secondary">View API</a>
+                </div>
+            </div>
+            
+            {% if resource_hogs.is_empty() %}
+            <div class="empty-state">
+                <div class="empty-state-icon">🖥️</div>
+                <h3>No Resource Hogs Detected</h3>
+                <p class="text-sm">All applications appear to be using resources efficiently.</p>
+            </div>
+            {% else %}
+            <div class="resource-hogs-grid" id="resourceHogsGrid">
+                {% for hog in resource_hogs %}
+                <div class="resource-hog-item" data-efficiency="{{ hog.efficiency_score }}" data-consumption="{{ hog.consumption_value }}">
+                    <div class="resource-hog-info">
+                        <div class="resource-hog-app">{{ hog.app_name }}</div>
+                        <div class="resource-hog-details">
+                            <span>{{ hog.app_id }}</span>
+                            <span>•</span>
+                            <span>{{ hog.efficiency_explanation }}</span>
+                        </div>
+                    </div>
+                    <div class="resource-hog-metric">
+                        <div class="resource-hog-value">{{ hog.consumption_value }}</div>
+                        <div class="resource-hog-unit">{{ hog.consumption_unit }}</div>
+                    </div>
+                    <div class="resource-hog-metric">
+                        <div class="resource-hog-value">{{ hog.efficiency_score }}%</div>
+                        <div class="resource-hog-unit">Efficiency</div>
+                    </div>
+                    <div class="resource-hog-metric">
+                        <div class="resource-hog-value">${{ hog.cost_impact }}</div>
+                        <div class="resource-hog-unit">Cost Impact</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Application Efficiency Analysis -->
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <h2>📊 Application Efficiency Analysis</h2>
+                    <div class="section-description">Identify over-provisioned and under-provisioned applications</div>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <select id="efficiencyFilter" onchange="filterEfficiencyAnalysis()" class="btn btn-secondary" style="padding: 0.5rem;">
+                        <option value="all">Show All ({{ efficiency_analysis.len() }})</option>
+                        <option value="problems">Problems Only</option>
+                        <option value="over">Over-Provisioned Only</option>
+                        <option value="under">Under-Provisioned Only</option>
+                        <option value="3" selected>Top 3 Issues</option>
+                        <option value="5">Top 5 Issues</option>
+                    </select>
+                    <a href="/api/v1/optimization/efficiency-analysis" target="_blank" class="btn btn-secondary">View API</a>
+                </div>
+            </div>
+            
+            {% if efficiency_analysis.is_empty() %}
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <h3>No Efficiency Data</h3>
+                <p class="text-sm">Efficiency analysis will appear here from processed applications.</p>
+            </div>
+            {% else %}
+            <div class="efficiency-grid" id="efficiencyGrid">
+                {% for app in efficiency_analysis %}
+                <div class="efficiency-card" 
+                     data-category="{{ app.efficiency_category }}" 
+                     data-memory-efficiency="{{ app.memory_efficiency }}" 
+                     data-cpu-efficiency="{{ app.cpu_efficiency }}"
+                     data-cost-savings="{{ app.potential_cost_savings }}">
+                    <div class="efficiency-header">
+                        <div class="efficiency-app-name">{{ app.app_name }}</div>
+                        <div class="efficiency-category badge badge-info">{{ app.efficiency_category }}</div>
+                    </div>
+                    
+                    <div class="efficiency-metrics">
+                        <div class="efficiency-metric">
+                            <div class="efficiency-metric-value">{{ app.memory_efficiency }}%</div>
+                            <div class="efficiency-metric-label">Memory: {{ app.memory_efficiency_explanation }}</div>
+                        </div>
+                        <div class="efficiency-metric">
+                            <div class="efficiency-metric-value">{{ app.cpu_efficiency }}%</div>
+                            <div class="efficiency-metric-label">CPU: {{ app.cpu_efficiency_explanation }}</div>
+                        </div>
+                    </div>
+
+                    {% if app.potential_cost_savings > 0.0 %}
+                    <div style="text-align: center; margin: 1rem 0;">
+                        <div style="font-size: 1.25rem; font-weight: 700; color: var(--success);">
+                            ${{ app.potential_cost_savings }}
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--gray-600);">Potential Daily Savings</div>
+                    </div>
+                    {% endif %}
+
+                    <div class="efficiency-actions">
+                        <h4>Optimization Actions:</h4>
+                        <ul>
+                            {% for action in app.optimization_actions %}
+                            <li>{{ action }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Cost Optimization Opportunities -->
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <h2>💰 Cost Optimization Opportunities</h2>
+                    <div class="section-description">Actionable recommendations to reduce infrastructure costs</div>
+                </div>
+                <a href="/api/v1/capacity/cost-optimization" target="_blank" class="btn btn-secondary">View API</a>
+            </div>
+            
+            {% if cost_optimizations.is_empty() %}
+            <div class="empty-state">
+                <div class="empty-state-icon">💰</div>
+                <h3>No Cost Optimizations Found</h3>
+                <p class="text-sm">Cost optimization opportunities will appear here from analyzed applications.</p>
+            </div>
+            {% else %}
+            <div class="cost-optimization-grid">
+                {% for opt in cost_optimizations %}
+                <div class="cost-item">
+                    <div class="cost-item-info">
+                        <div class="cost-item-app">{{ opt.app_name }}</div>
+                        <div class="cost-item-details">
+                            <strong>{{ opt.optimization_type }}:</strong> {{ opt.optimization_details }}
+                        </div>
+                        <div class="cost-item-details">
+                            <span class="badge badge-info">{{ opt.implementation_difficulty }}</span>
+                        </div>
+                    </div>
+                    <div class="cost-item-savings">
+                        <div class="cost-savings-amount">${{ opt.current_cost - opt.optimized_cost }}</div>
+                        <div class="cost-savings-percent">{{ opt.savings_percentage }}% savings</div>
+                    </div>
+                    <div class="cost-confidence">
+                        <div class="cost-confidence-score">{{ opt.confidence_score }}%</div>
+                        <div class="cost-confidence-label">Confidence</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Capacity Usage Trends -->
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <h2>📈 Capacity Usage Trends</h2>
+                    <div class="section-description">Track resource utilization over time for capacity planning</div>
+                </div>
+                <a href="/api/v1/capacity/usage-trends" target="_blank" class="btn btn-secondary">View API</a>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="capacityTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Quick Action Panel -->
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <h2>⚡ Quick Actions</h2>
+                    <div class="section-description">Platform engineering tools and API access</div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <a href="/api/v1/optimization/resource-hogs" target="_blank" class="btn btn-primary">🔥 Resource Hogs API</a>
+                <a href="/api/v1/optimization/efficiency-analysis" target="_blank" class="btn btn-primary">📊 Efficiency Analysis API</a>
+                <a href="/api/v1/capacity/usage-trends" target="_blank" class="btn btn-primary">📈 Capacity Trends API</a>
+                <a href="/api/v1/capacity/cost-optimization" target="_blank" class="btn btn-primary">💰 Cost Optimization API</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize capacity trends chart
+        function initializeCapacityChart() {
+            const ctx = document.getElementById('capacityTrendChart').getContext('2d');
+            
+            // Prepare data from server
+            const dates = [];
+            const memoryData = [];
+            const cpuData = [];
+            const appsData = [];
+            
+            // Static data for now - can be populated via API call if needed
+            {% for trend in capacity_trends %}
+            dates.push('{{ trend.date }}');
+            memoryData.push({{ trend.total_memory_gb_used }});
+            cpuData.push({{ trend.total_cpu_cores_used }});
+            appsData.push({{ trend.peak_concurrent_applications }});
+            {% endfor %}
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Memory Usage (GB)',
+                        data: memoryData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'CPU Cores Used',
+                        data: cpuData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Concurrent Applications',
+                        data: appsData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        fill: false,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Usage'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Resource Hogs Filtering
+        function filterResourceHogs() {
+            const filter = document.getElementById('resourceHogsFilter').value;
+            const grid = document.getElementById('resourceHogsGrid');
+            const items = Array.from(grid.children);
+            
+            // Sort items by efficiency score (ascending - worst first)
+            items.sort((a, b) => {
+                const efficiencyA = parseFloat(a.dataset.efficiency);
+                const efficiencyB = parseFloat(b.dataset.efficiency);
+                return efficiencyA - efficiencyB;
+            });
+            
+            // Show/hide based on filter
+            items.forEach((item, index) => {
+                if (filter === 'all') {
+                    item.style.display = 'flex';
+                } else {
+                    const limit = parseInt(filter);
+                    item.style.display = index < limit ? 'flex' : 'none';
+                }
+                grid.appendChild(item); // Re-order elements
+            });
+            
+            // Update section description
+            const shownCount = items.filter(item => item.style.display !== 'none').length;
+            console.log(`Showing ${shownCount} resource hogs (filtered by: ${filter})`);
+        }
+        
+        // Efficiency Analysis Filtering
+        function filterEfficiencyAnalysis() {
+            const filter = document.getElementById('efficiencyFilter').value;
+            const grid = document.getElementById('efficiencyGrid');
+            const items = Array.from(grid.children);
+            
+            // Sort items by cost savings potential (descending - highest savings first)
+            items.sort((a, b) => {
+                const savingsA = parseFloat(a.dataset.costSavings) || 0;
+                const savingsB = parseFloat(b.dataset.costSavings) || 0;
+                return savingsB - savingsA;
+            });
+            
+            // Show/hide based on filter
+            items.forEach((item, index) => {
+                const category = item.dataset.category;
+                let show = false;
+                
+                switch(filter) {
+                    case 'all':
+                        show = true;
+                        break;
+                    case 'problems':
+                        show = category === 'Over-Provisioned' || category === 'Under-Provisioned';
+                        break;
+                    case 'over':
+                        show = category === 'Over-Provisioned';
+                        break;
+                    case 'under':
+                        show = category === 'Under-Provisioned';
+                        break;
+                    default:
+                        // Top N issues (non-WellTuned apps)
+                        const limit = parseInt(filter);
+                        const isProblem = category === 'Over-Provisioned' || category === 'Under-Provisioned';
+                        const problemIndex = items.slice(0, index).filter(i => 
+                            i.dataset.category === 'Over-Provisioned' || i.dataset.category === 'Under-Provisioned'
+                        ).length;
+                        show = isProblem && problemIndex < limit;
+                        break;
+                }
+                
+                item.style.display = show ? 'block' : 'none';
+                grid.appendChild(item); // Re-order elements
+            });
+            
+            // Update section description
+            const shownCount = items.filter(item => item.style.display !== 'none').length;
+            console.log(`Showing ${shownCount} efficiency analysis entries (filtered by: ${filter})`);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCapacityChart();
+            
+            // Apply initial filters
+            filterResourceHogs();
+            filterEfficiencyAnalysis();
+            
+            console.log('✨ Platform Engineering Dashboard loaded with filtering!');
+        });
+    </script>
+</body>
+</html>

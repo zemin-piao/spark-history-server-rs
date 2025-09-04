@@ -87,13 +87,13 @@ async fn test_analytical_query_performance_100k_apps() {
     // Test 1: Cross-Application Summary Query
     println!("\n📊 Test 1: Cross-Application Summary");
     let query_start = Instant::now();
-    let params = AnalyticsQuery {
+    let _params = AnalyticsQuery {
         start_date: None,
         end_date: None,
         app_id: None,
         limit: Some(100),
     };
-    let summary = store.get_cross_app_summary(&params).await.unwrap();
+    let summary = store.get_cross_app_summary().await.unwrap();
     let query_duration = query_start.elapsed();
 
     println!("Results:");
@@ -117,7 +117,7 @@ async fn test_analytical_query_performance_100k_apps() {
         app_id: None,
         limit: Some(1000),
     };
-    let trends = store.get_performance_trends(&params).await.unwrap();
+    let trends = store.get_capacity_usage_trends(&params).await.unwrap();
     let query_duration = query_start.elapsed();
 
     println!("Results:");
@@ -126,16 +126,15 @@ async fn test_analytical_query_performance_100k_apps() {
 
     if let Some(first_trend) = trends.first() {
         println!(
-            "  Sample trend - App: {}, Avg duration: {:.1}ms",
-            first_trend.app_id,
-            first_trend.avg_task_duration_ms.unwrap_or(0.0)
+            "  Sample trend - Date: {}, Total memory used: {:.1}GB",
+            first_trend.date, first_trend.total_memory_gb_used
         );
     }
 
     query_results.push(("Performance Trends", query_duration, trends.len()));
 
-    // Test 3: Task Distribution Analysis
-    println!("\n📋 Test 3: Task Distribution Analysis");
+    // Test 3: Efficiency Analysis
+    println!("\n📋 Test 3: Efficiency Analysis");
     let query_start = Instant::now();
     let params = AnalyticsQuery {
         start_date: None,
@@ -143,32 +142,35 @@ async fn test_analytical_query_performance_100k_apps() {
         app_id: None,
         limit: Some(500),
     };
-    let distribution = store.get_task_distribution(&params).await.unwrap();
+    let efficiency = store.get_efficiency_analysis(&params).await.unwrap();
     let query_duration = query_start.elapsed();
 
     println!("Results:");
-    println!("  Distribution records: {}", distribution.len());
+    println!("  Efficiency records: {}", efficiency.len());
     println!("  Query time: {:.0}ms", query_duration.as_millis());
 
-    if let Some(first_dist) = distribution.first() {
+    if let Some(first_eff) = efficiency.first() {
         println!(
-            "  Sample dist - App: {}, Total tasks: {}, Completed: {}",
-            first_dist.app_id, first_dist.total_tasks, first_dist.completed_tasks
+            "  Sample efficiency - App: {}, Category: {}, Memory: {:.1}%",
+            first_eff.app_id, first_eff.efficiency_category, first_eff.memory_efficiency
         );
     }
 
-    query_results.push(("Task Distribution", query_duration, distribution.len()));
+    query_results.push(("Efficiency Analysis", query_duration, efficiency.len()));
 
     // Test 4: Executor Utilization Query
     println!("\n⚙️ Test 4: Executor Utilization Analysis");
     let query_start = Instant::now();
-    let params = AnalyticsQuery {
+    let _params = AnalyticsQuery {
         start_date: None,
         end_date: None,
         app_id: None,
         limit: Some(200),
     };
-    let utilization = store.get_executor_utilization(&params).await.unwrap();
+    let utilization = store
+        .get_executor_summary("application_1234567890_0001")
+        .await
+        .unwrap();
     let query_duration = query_start.elapsed();
 
     println!("Results:");
@@ -178,7 +180,7 @@ async fn test_analytical_query_performance_100k_apps() {
     if let Some(first_exec) = utilization.first() {
         println!(
             "  Sample executor - ID: {}, Total tasks: {}",
-            first_exec.executor_id, first_exec.total_tasks
+            first_exec.id, first_exec.total_tasks
         );
     }
 
@@ -223,10 +225,7 @@ async fn test_analytical_query_performance_100k_apps() {
         app_id: None,
         limit: Some(50),
     };
-    let resources = store
-        .get_resource_utilization_metrics(&params)
-        .await
-        .unwrap();
+    let resources = store.get_top_resource_consumers(&params).await.unwrap();
     let query_duration = query_start.elapsed();
 
     println!("Results:");
@@ -422,13 +421,13 @@ async fn test_concurrent_analytical_queries() {
                 let result = match query_num % 5 {
                     0 => {
                         // Cross-app summary
-                        let params = AnalyticsQuery {
+                        let _params = AnalyticsQuery {
                             start_date: None,
                             end_date: None,
                             app_id: None,
                             limit: Some(50),
                         };
-                        let summary = store_clone.get_cross_app_summary(&params).await.unwrap();
+                        let summary = store_clone.get_cross_app_summary().await.unwrap();
                         ("cross_app_summary", summary.total_events as usize)
                     }
                     1 => {
@@ -439,7 +438,10 @@ async fn test_concurrent_analytical_queries() {
                             app_id: None,
                             limit: Some(100),
                         };
-                        let trends = store_clone.get_performance_trends(&params).await.unwrap();
+                        let trends = store_clone
+                            .get_capacity_usage_trends(&params)
+                            .await
+                            .unwrap();
                         ("performance_trends", trends.len())
                     }
                     2 => {
@@ -450,7 +452,7 @@ async fn test_concurrent_analytical_queries() {
                             app_id: None,
                             limit: Some(75),
                         };
-                        let dist = store_clone.get_task_distribution(&params).await.unwrap();
+                        let dist = store_clone.get_efficiency_analysis(&params).await.unwrap();
                         ("task_distribution", dist.len())
                     }
                     3 => {
@@ -463,13 +465,16 @@ async fn test_concurrent_analytical_queries() {
                     }
                     4 => {
                         // Executor utilization
-                        let params = AnalyticsQuery {
+                        let _params = AnalyticsQuery {
                             start_date: None,
                             end_date: None,
                             app_id: None,
                             limit: Some(25),
                         };
-                        let exec = store_clone.get_executor_utilization(&params).await.unwrap();
+                        let exec = store_clone
+                            .get_executor_summary("application_1234567890_0001")
+                            .await
+                            .unwrap();
                         ("executor_util", exec.len())
                     }
                     _ => unreachable!(),
