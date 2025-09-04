@@ -137,6 +137,7 @@ pub struct CostOptimization {
     pub confidence_score: f64, // 0-100, how confident we are in the recommendation
     pub implementation_difficulty: DifficultyLevel,
     pub optimization_details: String,
+    pub formatted_savings: String, // Formatted savings amount like "$0.0384"
 }
 
 #[derive(Debug, Clone, Serialize)]

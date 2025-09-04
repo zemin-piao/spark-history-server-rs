@@ -155,6 +155,48 @@
             margin-top: 0.5rem;
         }
 
+        /* Tooltip styles */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            background-color: var(--gray-900);
+            color: white;
+            text-align: left;
+            border-radius: 6px;
+            padding: 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            width: 300px;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            opacity: 0;
+            transition: opacity 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .tooltip .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--gray-900) transparent transparent transparent;
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
         .summary-icon {
             position: absolute;
             top: 1rem;
@@ -554,10 +596,20 @@
                 <div class="summary-label">Under-Provisioned Apps</div>
             </div>
             
-            <div class="summary-card success">
+            <div class="summary-card success tooltip">
                 <div class="summary-icon">💰</div>
                 <div class="summary-value">{{ summary_stats.potential_monthly_savings }}</div>
                 <div class="summary-label">Potential Monthly Savings</div>
+                <span class="tooltip-text">
+                    <strong>Cost Calculation Model:</strong><br>
+                    • Current Cost: peak_memory_mb × $0.001<br>
+                    • 1GB memory = $1.00/month<br><br>
+                    <strong>Optimized Cost:</strong><br>
+                    • Over-provisioned: 40% reduction<br>
+                    • Poor partitioning: 20% reduction<br>
+                    • Spot instances: 30% reduction<br><br>
+                    <strong>Savings:</strong> current_cost - optimized_cost
+                </span>
             </div>
             
             <div class="summary-card">
@@ -730,7 +782,7 @@
                         </div>
                     </div>
                     <div class="cost-item-savings">
-                        <div class="cost-savings-amount">${{ opt.current_cost - opt.optimized_cost }}</div>
+                        <div class="cost-savings-amount">{{ opt.formatted_savings }}</div>
                         <div class="cost-savings-percent">{{ opt.savings_percentage }}% savings</div>
                     </div>
                     <div class="cost-confidence">

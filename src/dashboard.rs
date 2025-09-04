@@ -53,7 +53,7 @@ pub struct SummaryStats {
     pub total_resource_hogs: usize,
     pub over_provisioned_apps: usize,
     pub under_provisioned_apps: usize,
-    pub potential_monthly_savings: f64,
+    pub potential_monthly_savings: String,
     pub apps_needing_optimization: usize,
     pub high_confidence_optimizations: usize,
 }
@@ -188,10 +188,13 @@ pub async fn optimize_view(
                 )
             })
             .count(),
-        potential_monthly_savings: cost_optimizations
-            .iter()
-            .map(|c| c.current_cost - c.optimized_cost)
-            .sum(),
+        potential_monthly_savings: {
+            let total_savings: f64 = cost_optimizations
+                .iter()
+                .map(|c| (c.current_cost - c.optimized_cost).max(0.0))
+                .sum();
+            format!("${:.2}", total_savings)
+        },
         apps_needing_optimization: cost_optimizations.len(),
         high_confidence_optimizations: cost_optimizations
             .iter()

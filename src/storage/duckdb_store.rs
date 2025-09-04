@@ -714,12 +714,12 @@ impl DuckDbStore {
                     WHEN COALESCE((avg_cpu_time_ms / NULLIF(avg_wall_time_ms, 0) * 100), 0) > 90 THEN 'UnderProvisioned'
                     ELSE 'WellTuned'
                 END as efficiency_category,
-                -- Memory efficiency with spilling consideration
-                CASE 
+                -- Memory efficiency with spilling consideration (rounded to 1 decimal place)
+                ROUND(CASE 
                     WHEN total_memory_spill_mb > 1000 THEN 25.0
                     WHEN total_memory_spill_mb > 100 THEN 45.0
                     ELSE COALESCE(LEAST(100.0, (avg_memory_usage_mb / NULLIF(peak_memory_usage_mb, 0) * 100)), 0)
-                END as memory_efficiency,
+                END, 1) as memory_efficiency,
                 -- Memory efficiency explanation
                 COALESCE(
                     CASE 
@@ -730,8 +730,8 @@ impl DuckDbStore {
                     END,
                     '50% (insufficient data)'
                 ) as memory_efficiency_explanation,
-                -- CPU efficiency
-                COALESCE(LEAST(100.0, (avg_cpu_time_ms / NULLIF(avg_wall_time_ms, 0) * 100)), 0) as cpu_efficiency,
+                -- CPU efficiency (rounded to 1 decimal place)
+                ROUND(COALESCE(LEAST(100.0, (avg_cpu_time_ms / NULLIF(avg_wall_time_ms, 0) * 100)), 0), 1) as cpu_efficiency,
                 -- CPU efficiency explanation  
                 COALESCE(
                     CASE 
@@ -897,6 +897,14 @@ impl DuckDbStore {
     }
 
     /// Get cost optimization opportunities
+    ///
+    /// Cost Calculation Model:
+    /// - Current Cost: peak_memory_mb * $0.001 (1GB = $1.00/month)
+    /// - Optimized Cost: Varies by optimization type:
+    ///   - Over-provisioned memory: 40% reduction (peak_memory_mb * $0.0006)
+    ///   - Poor partitioning: 20% reduction (peak_memory_mb * $0.0008)  
+    ///   - Default (spot instances): 30% reduction (peak_memory_mb * $0.0007)
+    /// - Savings: current_cost - optimized_cost
     pub async fn get_cost_optimization_opportunities(
         &self,
         params: &crate::analytics_api::AnalyticsQuery,
@@ -919,26 +927,26 @@ impl DuckDbStore {
                 AND (? IS NULL OR timestamp <= ?)
                 AND (? IS NULL OR app_id = ?)
                 GROUP BY app_id
-                HAVING task_count > 3
+                HAVING task_count > 1
             )
             SELECT 
                 app_id,
                 app_name,
                 CASE 
-                    WHEN avg_memory_mb < peak_memory_mb * 0.5 THEN 'ReduceMemory'
-                    WHEN total_spill_mb > 1000 THEN 'OptimizePartitioning'
-                    WHEN avg_task_duration_s > 300 THEN 'ReduceExecutors'
+                    WHEN avg_memory_mb < peak_memory_mb * 0.8 THEN 'ReduceMemory'
+                    WHEN total_spill_mb > 100 THEN 'OptimizePartitioning'
+                    WHEN avg_task_duration_s > 30 THEN 'ReduceExecutors'
                     ELSE 'EnableSpotInstances'
                 END as optimization_type,
-                peak_memory_mb * 0.001 as current_cost, -- Rough cost estimate
-                CASE
-                    WHEN avg_memory_mb < peak_memory_mb * 0.5 THEN peak_memory_mb * 0.0005 -- 50% memory reduction
-                    WHEN total_spill_mb > 1000 THEN peak_memory_mb * 0.0008 -- 20% savings from better partitioning
+                ROUND(peak_memory_mb * 0.001, 4) as current_cost, -- Rough cost estimate (rounded to 4 decimal places)
+                ROUND(CASE
+                    WHEN avg_memory_mb < peak_memory_mb * 0.8 THEN peak_memory_mb * 0.0006 -- 40% memory reduction
+                    WHEN total_spill_mb > 100 THEN peak_memory_mb * 0.0008 -- 20% savings from better partitioning
                     ELSE peak_memory_mb * 0.0007 -- 30% savings from spot instances
-                END as optimized_cost,
+                END, 4) as optimized_cost,
                 CASE
-                    WHEN avg_memory_mb < peak_memory_mb * 0.5 THEN 50.0
-                    WHEN total_spill_mb > 1000 THEN 20.0
+                    WHEN avg_memory_mb < peak_memory_mb * 0.8 THEN 40.0
+                    WHEN total_spill_mb > 100 THEN 20.0
                     ELSE 30.0
                 END as savings_percentage,
                 CASE
@@ -947,20 +955,21 @@ impl DuckDbStore {
                     ELSE 50.0
                 END as confidence_score,
                 CASE
-                    WHEN avg_memory_mb < peak_memory_mb * 0.5 THEN 'Easy'
-                    WHEN total_spill_mb > 1000 THEN 'Medium'  
+                    WHEN avg_memory_mb < peak_memory_mb * 0.8 THEN 'Easy'
+                    WHEN total_spill_mb > 100 THEN 'Medium'  
                     ELSE 'Easy'
                 END as difficulty,
                 CASE
-                    WHEN avg_memory_mb < peak_memory_mb * 0.5 THEN 'Reduce executor memory from ' || CAST(peak_memory_mb as VARCHAR) || 'MB to ' || CAST(avg_memory_mb * 1.2 as VARCHAR) || 'MB'
-                    WHEN total_spill_mb > 1000 THEN 'Optimize data partitioning to reduce ' || CAST(total_spill_mb as VARCHAR) || 'MB of disk spill'
+                    WHEN avg_memory_mb < peak_memory_mb * 0.8 THEN 'Reduce executor memory from ' || CAST(peak_memory_mb as VARCHAR) || 'MB to ' || CAST(avg_memory_mb * 1.2 as VARCHAR) || 'MB'
+                    WHEN total_spill_mb > 100 THEN 'Optimize data partitioning to reduce ' || CAST(total_spill_mb as VARCHAR) || 'MB of disk spill'
                     ELSE 'Consider using spot instances for cost savings'
                 END as details
             FROM cost_analysis
             WHERE 
-                (avg_memory_mb < peak_memory_mb * 0.5)  -- Over-provisioned memory
-                OR (total_spill_mb > 1000)              -- Poor partitioning
-                OR (avg_task_duration_s > 60)           -- Long-running tasks
+                (avg_memory_mb < peak_memory_mb * 0.8)  -- Over-provisioned memory (relaxed from 0.5 to 0.8)
+                OR (total_spill_mb > 100)               -- Poor partitioning (relaxed from 1000MB to 100MB)
+                OR (avg_task_duration_s > 30)           -- Long-running tasks (relaxed from 60s to 30s)
+                OR (peak_memory_mb > 1024)              -- Apps using significant memory (>1GB)
             ORDER BY savings_percentage DESC
             LIMIT ?
         "#;
@@ -995,16 +1004,21 @@ impl DuckDbStore {
                     _ => DifficultyLevel::Medium,
                 };
 
+                let current_cost: f64 = row.get(3)?;
+                let optimized_cost: f64 = row.get(4)?;
+                let savings = (current_cost - optimized_cost).max(0.0);
+
                 Ok(CostOptimization {
                     optimization_type,
                     app_id: row.get(0)?,
                     app_name: row.get(1)?,
-                    current_cost: row.get(3)?,
-                    optimized_cost: row.get(4)?,
+                    current_cost,
+                    optimized_cost,
                     savings_percentage: row.get(5)?,
                     confidence_score: row.get(6)?,
                     implementation_difficulty: difficulty,
                     optimization_details: row.get(8)?,
+                    formatted_savings: format!("${:.4}", savings),
                 })
             },
         )?;
