@@ -21,7 +21,7 @@ A **analytics-first** Spark History Server implementation in Rust, purpose-built
 - ✅ **HDFS Support**: Native HDFS integration via `hdfs-native`
 - ✅ **Enterprise Scale**: **Load tested with 100K applications, 2M events**
 - ✅ **High Performance**: **10,700 events/sec sustained throughput**
-- ✅ **Web Dashboard**: Analytics-focused web dashboard with cluster overview, performance insights, and optimization recommendations
+- ✅ **Web Dashboard**: Platform engineering dashboard with resource optimization, efficiency analysis, and cost savings recommendations
 - 🚧 **Production Features**: Metrics, monitoring, security features planned
 
 ## 🎯 **Analytics-First Design Philosophy**
@@ -56,14 +56,16 @@ This Spark History Server is **purpose-built for analytics**, not individual app
 
 ## 🌐 **API Endpoints & Capabilities**
 
-### 🎯 **Analytics-First Endpoints (Our Strength)**
+### 🎯 **Platform Engineering Endpoints (Our Strength)**
 
-**✅ Advanced Cross-Application Analytics**
+**✅ Resource Optimization & Cost Analysis**
+- `GET /api/v1/optimization/resource-hogs` - **TOP resource consuming applications** (Memory, CPU, Disk hogs)
+- `GET /api/v1/optimization/efficiency-analysis` - **Application efficiency analysis** (over/under-provisioned apps)
+- `GET /api/v1/capacity/usage-trends` - **Capacity usage trends** for planning and forecasting
+- `GET /api/v1/capacity/cost-optimization` - **Cost optimization opportunities** with actionable recommendations
+
+**✅ Cross-Application Analytics**  
 - `GET /api/v1/analytics/cross-app-summary` - **Enterprise-wide Spark metrics** across all applications
-- `GET /api/v1/analytics/performance-trends` - **Time-series performance analysis** for capacity planning  
-- `GET /api/v1/analytics/resource-usage` - **Resource utilization patterns** and optimization insights
-- `GET /api/v1/analytics/task-distribution` - **Task performance distribution** and locality analysis across apps
-- `GET /api/v1/analytics/executor-utilization` - **Cross-application executor efficiency** metrics
 
 ### 📋 **Standard Spark History Server API v1 (Basic Compatibility)**
 
@@ -90,11 +92,10 @@ For detailed individual application analysis, use the standard Spark History Ser
 
 ### 🎨 **Web Dashboard**
 
-**✅ Analytics-Focused Dashboard Views**
-- `GET /` - **Cluster Overview**: Real-time cluster status, active applications, and key metrics summary
-- `GET /analytics` - **Analytics Dashboard**: Comprehensive performance analytics and cross-application insights
-- `GET /optimize` - **Optimization View**: Performance trends, resource utilization, and task distribution analysis
-- `GET /resources` - **Resource Management**: Executor utilization and capacity planning insights *(coming soon)*
+**✅ Platform Engineering Dashboard Views**
+- `GET /` - **Cluster Overview**: Real-time cluster status, active applications, and key metrics summary  
+- `GET /optimize` - **🎯 Optimization Dashboard**: Resource hogs, efficiency analysis, capacity trends, and cost optimization opportunities
+- `GET /resources` - **Resource Management**: Redirects to optimization dashboard *(integrated)*
 - `GET /teams` - **Team Analytics**: User/team resource attribution and usage patterns *(coming soon)*
 
 ### 🏥 **System Health**
