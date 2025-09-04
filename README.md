@@ -12,6 +12,12 @@ A **analytics-first** Spark History Server implementation in Rust, purpose-built
 
 **🏆 Proven Performance: Successfully tested with 100,000 applications and 2M events at 10,700 events/sec**
 
+## UI screenshot
+
+![Summary](img/summary.png)
+![App Analysis](img/appanalysis.png)
+![Top Resource Consumers](img/topresource.png)
+
 ## Current Status
 
 - ✅ **Core Infrastructure**: Event log parsing, DuckDB integration, incremental scanning
@@ -38,7 +44,7 @@ This Spark History Server is **purpose-built for analytics**, not individual app
 
 ### **❌ What Traditional Servers Do Better (Individual App Details)**
 - Individual job/stage/task drill-down details
-- Real-time application monitoring and debugging  
+- Real-time application monitoring and debugging
 - Task-level performance analysis within a single application
 - Detailed executor thread dumps and live metrics
 - SQL query execution plan analysis
@@ -64,7 +70,7 @@ This Spark History Server is **purpose-built for analytics**, not individual app
 - `GET /api/v1/capacity/usage-trends` - **Capacity usage trends** for planning and forecasting
 - `GET /api/v1/capacity/cost-optimization` - **Cost optimization opportunities** with actionable recommendations
 
-**✅ Cross-Application Analytics**  
+**✅ Cross-Application Analytics**
 - `GET /api/v1/analytics/cross-app-summary` - **Enterprise-wide Spark metrics** across all applications
 
 ### 📋 **Standard Spark History Server API v1 (Basic Compatibility)**
@@ -77,7 +83,7 @@ This Spark History Server is **purpose-built for analytics**, not individual app
 
 **⚠️ Limited Implementation (application-level only)**
 - `GET /api/v1/applications/{appId}/jobs` - Basic job listing (no detailed drill-down)
-- `GET /api/v1/applications/{appId}/stages` - Basic stage listing (no task-level details)  
+- `GET /api/v1/applications/{appId}/stages` - Basic stage listing (no task-level details)
 - `GET /api/v1/applications/{appId}/environment` - Application environment summary
 - `GET /api/v1/applications/{appId}/storage/rdd` - RDD storage summary
 
@@ -85,7 +91,7 @@ This Spark History Server is **purpose-built for analytics**, not individual app
 
 For detailed individual application analysis, use the standard Spark History Server:
 - Job/Stage/Task detailed drill-down endpoints
-- SQL query execution plan analysis (`/sql/*` endpoints)  
+- SQL query execution plan analysis (`/sql/*` endpoints)
 - Streaming batch analysis (`/streaming/*` endpoints)
 - Executor thread dumps and live metrics
 - Event log downloads and detailed task analysis
@@ -93,7 +99,7 @@ For detailed individual application analysis, use the standard Spark History Ser
 ### 🎨 **Web Dashboard**
 
 **✅ Platform Engineering Dashboard Views**
-- `GET /` - **Cluster Overview**: Real-time cluster status, active applications, and key metrics summary  
+- `GET /` - **Cluster Overview**: Real-time cluster status, active applications, and key metrics summary
 - `GET /optimize` - **🎯 Optimization Dashboard**: Resource hogs, efficiency analysis, capacity trends, and cost optimization opportunities
 - `GET /resources` - **Resource Management**: Redirects to optimization dashboard *(integrated)*
 - `GET /teams` - **Team Analytics**: User/team resource attribution and usage patterns *(coming soon)*
@@ -158,7 +164,7 @@ curl http://localhost:18080/health
 
 # Web Dashboard (open in browser)
 open http://localhost:18080                    # Cluster overview dashboard
-open http://localhost:18080/analytics          # Analytics dashboard  
+open http://localhost:18080/analytics          # Analytics dashboard
 open http://localhost:18080/optimize           # Optimization insights
 
 # API endpoints
@@ -221,7 +227,7 @@ All HDFS settings support environment variable fallbacks:
 ```bash
 # Set environment variables
 export HDFS_NAMENODE_URL=hdfs://secure-namenode:9000
-export KERBEROS_PRINCIPAL=spark@EXAMPLE.COM  
+export KERBEROS_PRINCIPAL=spark@EXAMPLE.COM
 export KERBEROS_KEYTAB=/etc/security/keytabs/spark.keytab
 export KRB5_CONFIG=/etc/krb5.conf
 export KERBEROS_REALM=EXAMPLE.COM
@@ -279,7 +285,7 @@ cargo test test_hdfs_comprehensive_file_operations --release
 cargo test test_hdfs_error_handling_scenarios --release
 cargo test test_hdfs_concurrent_operations --release
 
-# 3. Kerberos Authentication Tests  
+# 3. Kerberos Authentication Tests
 cargo test test_kerberos_configuration --release
 cargo test test_kerberos_valid_authentication --release
 cargo test test_kerberos_expired_tickets --release
@@ -297,7 +303,7 @@ cargo test test_configuration_precedence --release
 # For Kerberos: KERBEROS_PRINCIPAL, KERBEROS_KEYTAB, etc.
 
 cargo test test_real_hdfs_connection_health --ignored
-cargo test test_real_hdfs_kerberos_authentication --ignored  
+cargo test test_real_hdfs_kerberos_authentication --ignored
 cargo test test_real_hdfs_spark_event_logs --ignored
 cargo test test_real_hdfs_performance_benchmarks --ignored
 ```
@@ -324,14 +330,14 @@ The Spark History Server is built around a modern, analytics-first architecture 
    - **Schema Flexibility**: Handles 10+ Spark event types with hot field extraction + JSON fallback
    - **Health Monitoring**: Automated HDFS connectivity and authentication health checks
 
-2. **DuckDB Storage Layer** 
+2. **DuckDB Storage Layer**
    - **Embedded Analytical Database**: Single-file database optimized for analytics workloads
    - **Columnar Storage**: Fast aggregations and time-series queries across applications
    - **Flexible Schema**: Combined structured fields + JSON column for event diversity
    - **Cross-Application Queries**: SQL analytics across all Spark applications simultaneously
 
 3. **REST API Server & Web Dashboard**
-   - **Dual API Support**: Standard Spark History Server v1 + advanced analytics endpoints  
+   - **Dual API Support**: Standard Spark History Server v1 + advanced analytics endpoints
    - **Built-in Web Dashboard**: Server-side rendered dashboard using Askama templates
    - **Multiple Dashboard Views**: Cluster overview, analytics, optimization insights, and resource management
    - **In-Memory Caching**: Hot data caching for frequently accessed applications
@@ -344,7 +350,7 @@ The Spark History Server is built around a modern, analytics-first architecture 
 │        Storage Layer            │ -> │  Event Processor │ -> │   DuckDB Store   │ -> │ API + Dashboard │
 │                                 │    │                  │    │                  │    │                 │
 │ HDFS (with Kerberos):           │    │ • Argument-based │    │ • Events Table   │    │ • REST API      │
-│ • hdfs://namenode:9000          │    │   Reader Switch  │    │ • JSON + Hot     │    │ • Analytics     │ 
+│ • hdfs://namenode:9000          │    │   Reader Switch  │    │ • JSON + Hot     │    │ • Analytics     │
 │ • /spark-events/*.lz4           │    │ • Incremental    │    │   Fields         │    │ • Web Dashboard │
 │ • Kerberos Authentication       │    │   Scanning       │    │ • Timeout        │    │ • Multi-View UI │
 │                                 │    │ • Batch Writing  │    │   Handling       │    │ • Health Check  │
@@ -385,7 +391,7 @@ Our comprehensive load testing demonstrates exceptional performance at enterpris
 🎯 ENTERPRISE SCALE LOAD TEST - SUCCESS
 ==========================================
 ✅ Applications Created: 100,000
-✅ Events Processed: 2,000,000  
+✅ Events Processed: 2,000,000
 ✅ Write Throughput: 10,702 events/sec
 ✅ Database Size: 437 MB (229 bytes/event)
 ✅ Memory per App: 4,585 bytes/app
@@ -394,7 +400,7 @@ Our comprehensive load testing demonstrates exceptional performance at enterpris
 
 Query Performance Highlights:
 📱 Application List (50 apps): 3ms
-📊 Event Count (2M events): 0ms  
+📊 Event Count (2M events): 0ms
 ⚙️ Executor Summary: 11ms
 💾 Perfect data integrity maintained
 ```
@@ -417,7 +423,7 @@ cargo test test_write_performance_scaling --release -- --nocapture
 
 **Available Load Tests:**
 - **100K Applications Test**: Full enterprise-scale simulation
-- **Write Performance**: Batch size optimization testing  
+- **Write Performance**: Batch size optimization testing
 - **API Load Testing**: Concurrent user simulation
 - **File Processing Pipeline**: End-to-end event log processing
 - **Analytical Query Performance**: Complex cross-app analytics
@@ -431,7 +437,7 @@ See [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) for detailed performance analys
 Additional documentation is available in the `docs/` folder:
 
 - **[docs/LOAD_TESTING.md](docs/LOAD_TESTING.md)** - Comprehensive load testing and performance benchmarking guide
-- **[docs/HDFS_INTEGRATION.md](docs/HDFS_INTEGRATION.md)** - Detailed HDFS integration and configuration guide  
+- **[docs/HDFS_INTEGRATION.md](docs/HDFS_INTEGRATION.md)** - Detailed HDFS integration and configuration guide
 - **[docs/SCRIPT_ORGANIZATION.md](docs/SCRIPT_ORGANIZATION.md)** - Development scripts and tooling documentation
 - **[docs/demo.md](docs/demo.md)** - Demo and example usage scenarios
 
@@ -445,7 +451,7 @@ cargo test
 
 # Run specific test suites
 cargo test --test integration_test
-cargo test --test analytics_api_test  
+cargo test --test analytics_api_test
 cargo test --test incremental_scan_test
 
 # Run HDFS integration tests
