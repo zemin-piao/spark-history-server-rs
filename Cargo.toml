@@ -27,6 +27,11 @@ zip = "0.6"
 # Hadoop/HDFS integration
 hdfs-native = "0.10"
 
+# AWS S3 integration
+aws-sdk-s3 = "1.0"
+aws-config = "1.0"
+aws-types = "1.0"
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

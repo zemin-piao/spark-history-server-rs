@@ -93,7 +93,7 @@ async fn test_real_hdfs_directory_operations() -> Result<()> {
     println!();
 
     let hdfs_config = get_test_hdfs_config();
-    let file_reader = create_file_reader("/", Some(&hdfs_config)).await?;
+    let file_reader = create_file_reader("/", Some(&hdfs_config), None).await?;
 
     println!("Testing root directory listing...");
     let root_entries = file_reader.list_directory(Path::new("/")).await?;
@@ -217,7 +217,7 @@ async fn test_real_hdfs_spark_event_logs() -> Result<()> {
     println!();
 
     let hdfs_config = get_test_hdfs_config();
-    let file_reader = create_file_reader(&spark_events_dir, Some(&hdfs_config)).await?;
+    let file_reader = create_file_reader(&spark_events_dir, Some(&hdfs_config), None).await?;
 
     println!("Scanning for Spark event logs...");
     let entries = file_reader
@@ -350,6 +350,7 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
         compression_enabled: true,
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config),
+        s3: None,
     };
 
     println!("Creating HistoryProvider with HDFS configuration...");
@@ -483,7 +484,7 @@ async fn test_real_hdfs_performance_benchmarks() -> Result<()> {
     println!();
 
     let hdfs_config = get_test_hdfs_config();
-    let file_reader = create_file_reader("/", Some(&hdfs_config)).await?;
+    let file_reader = create_file_reader("/", Some(&hdfs_config), None).await?;
 
     println!("Running HDFS performance benchmarks...");
     println!();
@@ -538,7 +539,7 @@ async fn test_real_hdfs_performance_benchmarks() -> Result<()> {
 
     for i in 0..5 {
         let test_hdfs_config = get_test_hdfs_config();
-        let reader = Arc::new(create_file_reader("/", Some(&test_hdfs_config)).await?);
+        let reader = Arc::new(create_file_reader("/", Some(&test_hdfs_config), None).await?);
         let handle = tokio::spawn(async move {
             let start = std::time::Instant::now();
             let result = reader.list_directory(Path::new("/")).await;

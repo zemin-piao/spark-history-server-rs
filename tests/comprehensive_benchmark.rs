@@ -395,6 +395,7 @@ impl ComprehensiveBenchmark {
             compression_enabled: true,
             database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
             hdfs: None,
+            s3: None,
         };
 
         let history_provider = HistoryProvider::new(history_settings).await?;

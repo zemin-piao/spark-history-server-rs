@@ -7,5 +7,6 @@ pub mod event_processor;
 pub mod hdfs_reader;
 pub mod metadata_store;
 pub mod models;
+pub mod s3_reader;
 pub mod spark_events;
 pub mod storage;

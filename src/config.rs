@@ -37,6 +37,9 @@ pub struct HistoryConfig {
 
     /// HDFS configuration (optional)
     pub hdfs: Option<HdfsConfig>,
+
+    /// S3 configuration (optional)
+    pub s3: Option<S3Config>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +72,33 @@ pub struct KerberosConfig {
     pub realm: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct S3Config {
+    /// S3 bucket name
+    pub bucket_name: String,
+
+    /// AWS region (e.g., us-east-1)
+    pub region: Option<String>,
+
+    /// Custom S3 endpoint URL (for S3-compatible services like MinIO)
+    pub endpoint_url: Option<String>,
+
+    /// AWS access key ID
+    pub access_key_id: Option<String>,
+
+    /// AWS secret access key
+    pub secret_access_key: Option<String>,
+
+    /// AWS session token (for temporary credentials)
+    pub session_token: Option<String>,
+
+    /// Connection timeout in milliseconds
+    pub connection_timeout_ms: Option<u64>,
+
+    /// Read timeout in milliseconds
+    pub read_timeout_ms: Option<u64>,
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -85,6 +115,7 @@ impl Default for Settings {
                 compression_enabled: true,
                 database_directory: Some("./data".to_string()),
                 hdfs: None,
+                s3: None,
             },
         }
     }

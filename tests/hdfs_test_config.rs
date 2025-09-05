@@ -9,6 +9,7 @@ pub fn mock_hdfs_config() -> HistoryConfig {
         compression_enabled: true,
         database_directory: None,
         hdfs: None,
+        s3: None,
     }
 }
 
@@ -21,6 +22,7 @@ pub fn test_hdfs_config() -> HistoryConfig {
         compression_enabled: true,
         database_directory: None,
         hdfs: None,
+        s3: None,
     }
 }
 
@@ -33,6 +35,7 @@ pub fn large_scale_hdfs_config() -> HistoryConfig {
         compression_enabled: true,
         database_directory: None,
         hdfs: None,
+        s3: None,
     }
 }
 

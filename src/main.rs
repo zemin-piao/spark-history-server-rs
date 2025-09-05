@@ -10,10 +10,11 @@ mod circuit_breaker;
 mod config;
 mod dashboard;
 mod models;
+mod s3_reader;
 mod storage;
 
 use crate::api::create_app;
-use crate::config::{HdfsConfig, KerberosConfig, Settings};
+use crate::config::{HdfsConfig, KerberosConfig, S3Config, Settings};
 use crate::storage::HistoryProvider;
 
 #[derive(Parser, Debug)]
@@ -71,6 +72,42 @@ struct Args {
     /// HDFS read timeout in milliseconds
     #[arg(long, default_value = "60000")]
     hdfs_read_timeout: u64,
+
+    /// Use S3 for reading event logs
+    #[arg(long)]
+    s3: bool,
+
+    /// S3 bucket name
+    #[arg(long)]
+    s3_bucket: Option<String>,
+
+    /// AWS region (e.g., us-east-1)
+    #[arg(long)]
+    s3_region: Option<String>,
+
+    /// Custom S3 endpoint URL (for S3-compatible services like MinIO)
+    #[arg(long)]
+    s3_endpoint: Option<String>,
+
+    /// AWS access key ID
+    #[arg(long)]
+    aws_access_key_id: Option<String>,
+
+    /// AWS secret access key
+    #[arg(long)]
+    aws_secret_access_key: Option<String>,
+
+    /// AWS session token (for temporary credentials)
+    #[arg(long)]
+    aws_session_token: Option<String>,
+
+    /// S3 connection timeout in milliseconds
+    #[arg(long, default_value = "30000")]
+    s3_connection_timeout: u64,
+
+    /// S3 read timeout in milliseconds
+    #[arg(long, default_value = "60000")]
+    s3_read_timeout: u64,
 }
 
 #[tokio::main]
@@ -153,9 +190,43 @@ async fn main() -> Result<()> {
         }
     }
 
+    // Handle S3 configuration from CLI arguments
+    if args.s3 {
+        let bucket_name = args
+            .s3_bucket
+            .or_else(|| std::env::var("AWS_S3_BUCKET").ok())
+            .expect("S3 bucket name is required when using S3 mode");
+
+        settings.history.s3 = Some(S3Config {
+            bucket_name: bucket_name.clone(),
+            region: args.s3_region.or_else(|| std::env::var("AWS_REGION").ok()),
+            endpoint_url: args
+                .s3_endpoint
+                .or_else(|| std::env::var("AWS_ENDPOINT_URL").ok()),
+            access_key_id: args
+                .aws_access_key_id
+                .or_else(|| std::env::var("AWS_ACCESS_KEY_ID").ok()),
+            secret_access_key: args
+                .aws_secret_access_key
+                .or_else(|| std::env::var("AWS_SECRET_ACCESS_KEY").ok()),
+            session_token: args
+                .aws_session_token
+                .or_else(|| std::env::var("AWS_SESSION_TOKEN").ok()),
+            connection_timeout_ms: Some(args.s3_connection_timeout),
+            read_timeout_ms: Some(args.s3_read_timeout),
+        });
+
+        info!("S3 mode enabled with bucket: {}", bucket_name);
+        if let Some(endpoint) = &settings.history.s3.as_ref().unwrap().endpoint_url {
+            info!("Using custom S3 endpoint: {}", endpoint);
+        }
+    }
+
     info!("Starting Spark History Server");
     info!("Log directory: {}", settings.history.log_directory);
-    if args.hdfs {
+    if args.s3 {
+        info!("Storage backend: S3");
+    } else if args.hdfs {
         info!("Storage backend: HDFS");
     } else {
         info!("Storage backend: Local filesystem");

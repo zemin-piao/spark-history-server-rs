@@ -6,7 +6,8 @@ use tokio::fs;
 use tracing::{debug, info, warn};
 
 use crate::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
-use crate::config::{HdfsConfig, KerberosConfig};
+use crate::config::{HdfsConfig, KerberosConfig, S3Config};
+use crate::s3_reader::S3Reader;
 
 /// Trait for reading files from different storage backends
 #[async_trait]
@@ -330,12 +331,209 @@ impl FileReader for HdfsFileReader {
     }
 }
 
+pub struct S3FileReader {
+    s3_reader: S3Reader,
+    prefix: String,
+    circuit_breaker: Arc<CircuitBreaker>,
+}
+
+impl S3FileReader {
+    pub async fn new(config: S3Config, prefix: String) -> Result<Self> {
+        info!(
+            "Initializing S3 file reader for bucket: {} with prefix: {}",
+            config.bucket_name, prefix
+        );
+
+        let s3_reader = S3Reader::new(config.clone()).await?;
+
+        // Create circuit breaker for S3 file operations
+        let circuit_breaker_config = CircuitBreakerConfig {
+            failure_threshold: 3,
+            success_threshold: 2,
+            timeout_duration: std::time::Duration::from_secs(30),
+            window_duration: std::time::Duration::from_secs(300),
+        };
+        let circuit_breaker = Arc::new(CircuitBreaker::new(
+            format!("s3-file-reader-{}", config.bucket_name),
+            circuit_breaker_config,
+        ));
+
+        Ok(Self {
+            s3_reader,
+            prefix,
+            circuit_breaker,
+        })
+    }
+
+    #[allow(dead_code)]
+    pub async fn new_simple(bucket_name: &str, region: Option<&str>, prefix: &str) -> Result<Self> {
+        let config = S3Config {
+            bucket_name: bucket_name.to_string(),
+            region: region.map(|r| r.to_string()),
+            endpoint_url: None,
+            access_key_id: None,
+            secret_access_key: None,
+            session_token: None,
+            connection_timeout_ms: Some(30000),
+            read_timeout_ms: Some(60000),
+        };
+
+        Self::new(config, prefix.to_string()).await
+    }
+
+    pub async fn health_check(&self) -> Result<bool> {
+        debug!("Performing S3 file reader health check");
+
+        let result = self
+            .circuit_breaker
+            .call(async {
+                self.s3_reader
+                    .health_check()
+                    .await
+                    .map_err(|e| anyhow!("S3 file reader health check failed: {}", e))
+            })
+            .await;
+
+        match result {
+            Ok(healthy) => {
+                debug!("S3 file reader health check passed");
+                Ok(healthy)
+            }
+            Err(e) => {
+                if e.is_circuit_open() {
+                    warn!("S3 file reader health check failed: circuit breaker is open");
+                } else {
+                    warn!("S3 file reader health check failed: {:?}", e);
+                }
+                Err(anyhow!("S3 file reader health check failed: {:?}", e))
+            }
+        }
+    }
+
+    pub fn s3_key_from_path(&self, path: &Path) -> String {
+        let path_str = path.to_string_lossy();
+        if self.prefix.is_empty() {
+            path_str.to_string()
+        } else {
+            format!("{}/{}", self.prefix.trim_end_matches('/'), path_str)
+        }
+    }
+}
+
+#[async_trait]
+impl FileReader for S3FileReader {
+    async fn read_file(&self, path: &Path) -> Result<String> {
+        let s3_key = self.s3_key_from_path(path);
+        debug!("Reading S3 file: {}", s3_key);
+
+        let result = self
+            .circuit_breaker
+            .call(async {
+                self.s3_reader
+                    .read_object(&s3_key)
+                    .await
+                    .map_err(|e| anyhow!("Failed to read S3 object {}: {}", s3_key, e))
+            })
+            .await;
+
+        match result {
+            Ok(content) => Ok(content),
+            Err(e) => {
+                if e.is_circuit_open() {
+                    Err(anyhow!("S3 read failed: circuit breaker is open"))
+                } else {
+                    Err(e
+                        .into_inner()
+                        .unwrap_or_else(|| anyhow!("Unknown S3 error")))
+                }
+            }
+        }
+    }
+
+    async fn list_directory(&self, path: &Path) -> Result<Vec<String>> {
+        let s3_prefix = if path.to_string_lossy().is_empty() {
+            self.prefix.clone()
+        } else {
+            self.s3_key_from_path(path)
+        };
+
+        debug!("Listing S3 directory with prefix: {}", s3_prefix);
+
+        let result = self
+            .circuit_breaker
+            .call(async {
+                self.s3_reader
+                    .list_applications(&s3_prefix)
+                    .await
+                    .map_err(|e| anyhow!("Failed to list S3 directory {}: {}", s3_prefix, e))
+            })
+            .await;
+
+        match result {
+            Ok(entries) => Ok(entries),
+            Err(e) => {
+                if e.is_circuit_open() {
+                    Err(anyhow!("S3 list failed: circuit breaker is open"))
+                } else {
+                    Err(e
+                        .into_inner()
+                        .unwrap_or_else(|| anyhow!("Unknown S3 error")))
+                }
+            }
+        }
+    }
+
+    async fn file_exists(&self, path: &Path) -> bool {
+        let s3_key = self.s3_key_from_path(path);
+        debug!("Checking S3 file existence: {}", s3_key);
+
+        let result = self
+            .circuit_breaker
+            .call::<_, bool, anyhow::Error>(async {
+                Ok(self.s3_reader.object_exists(&s3_key).await)
+            })
+            .await;
+
+        match result {
+            Ok(exists) => {
+                debug!(
+                    "S3 file exists check result: {} for key: {}",
+                    exists, s3_key
+                );
+                exists
+            }
+            Err(e) => {
+                if e.is_circuit_open() {
+                    warn!("S3 file existence check failed: circuit breaker is open");
+                } else {
+                    debug!("S3 file existence check failed for {}: {:?}", s3_key, e);
+                }
+                false
+            }
+        }
+    }
+}
+
 /// Create a file reader based on configuration
 pub async fn create_file_reader(
     log_directory: &str,
     hdfs_config: Option<&HdfsConfig>,
+    s3_config: Option<&S3Config>,
 ) -> Result<Box<dyn FileReader>> {
-    if let Some(hdfs_config) = hdfs_config {
+    if let Some(s3_config) = s3_config {
+        info!(
+            "Creating S3 file reader for bucket: {} with prefix: {}",
+            s3_config.bucket_name, log_directory
+        );
+        let reader = S3FileReader::new(s3_config.clone(), log_directory.to_string()).await?;
+
+        // Perform health check
+        if let Err(e) = reader.health_check().await {
+            warn!("S3 health check failed, but continuing: {}", e);
+        }
+
+        Ok(Box::new(reader))
+    } else if let Some(hdfs_config) = hdfs_config {
         info!("Creating HDFS file reader for directory: {}", log_directory);
         let reader = HdfsFileReader::new(hdfs_config.clone())?;
 

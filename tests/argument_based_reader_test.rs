@@ -31,7 +31,7 @@ async fn test_argument_based_local_reader_selection() -> Result<()> {
 
     // Test local file reader creation (no HDFS config)
     let log_directory = log_dir.to_string_lossy();
-    let file_reader = create_file_reader(&log_directory, None).await?;
+    let file_reader = create_file_reader(&log_directory, None, None).await?;
 
     // Test file reading
     let content = file_reader.read_file(&event_log_path).await?;
@@ -66,7 +66,7 @@ async fn test_argument_based_hdfs_reader_selection() -> Result<()> {
     };
 
     // Create file reader with HDFS config
-    let file_reader = create_file_reader("/hdfs/spark-events", Some(&hdfs_config)).await;
+    let file_reader = create_file_reader("/hdfs/spark-events", Some(&hdfs_config), None).await;
 
     // This will likely fail in CI/testing environment, but we can test the creation
     match file_reader {
@@ -105,7 +105,8 @@ async fn test_argument_based_hdfs_with_kerberos() -> Result<()> {
     };
 
     // Create file reader with HDFS + Kerberos config
-    let file_reader = create_file_reader("/hdfs/secure-spark-events", Some(&hdfs_config)).await;
+    let file_reader =
+        create_file_reader("/hdfs/secure-spark-events", Some(&hdfs_config), None).await;
 
     match file_reader {
         Ok(_) => {
@@ -151,6 +152,7 @@ async fn test_history_provider_with_local_reader() -> Result<()> {
         compression_enabled: true,
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None, // This forces local file reader selection
+        s3: None,
     };
 
     // Create history provider - this should use local file reader
@@ -195,6 +197,7 @@ async fn test_history_provider_with_hdfs_config() -> Result<()> {
         compression_enabled: true,
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config), // This forces HDFS file reader selection
+        s3: None,
     };
 
     // Create history provider - this should use HDFS file reader
@@ -235,7 +238,7 @@ async fn test_runtime_reader_switching() -> Result<()> {
 
     // Test 1: Create with local reader
     println!("Creating local file reader...");
-    let local_reader = create_file_reader(&log_dir.to_string_lossy(), None).await?;
+    let local_reader = create_file_reader(&log_dir.to_string_lossy(), None, None).await?;
 
     let entries = local_reader.list_directory(log_dir.as_path()).await?;
     assert!(entries.contains(&"app-switch-test".to_string()));
@@ -249,7 +252,8 @@ async fn test_runtime_reader_switching() -> Result<()> {
         kerberos: None,
     };
 
-    let hdfs_reader_result = create_file_reader("/hdfs/spark-events", Some(&hdfs_config)).await;
+    let hdfs_reader_result =
+        create_file_reader("/hdfs/spark-events", Some(&hdfs_config), None).await;
 
     match hdfs_reader_result {
         Ok(_) => println!("HDFS reader created successfully"),
@@ -258,7 +262,7 @@ async fn test_runtime_reader_switching() -> Result<()> {
 
     // Test 3: Switch back to local reader
     println!("Switching back to local file reader...");
-    let local_reader_2 = create_file_reader(&log_dir.to_string_lossy(), None).await?;
+    let local_reader_2 = create_file_reader(&log_dir.to_string_lossy(), None, None).await?;
 
     let entries_2 = local_reader_2.list_directory(log_dir.as_path()).await?;
     assert!(entries_2.contains(&"app-switch-test".to_string()));
@@ -283,6 +287,7 @@ async fn test_configuration_precedence() -> Result<()> {
         compression_enabled: true,
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None,
+        s3: None,
     };
 
     assert!(default_config.hdfs.is_none());
@@ -302,6 +307,7 @@ async fn test_configuration_precedence() -> Result<()> {
             read_timeout_ms: Some(30000),
             kerberos: None,
         }),
+        s3: None,
     };
 
     assert!(hdfs_override_config.hdfs.is_some());

@@ -123,6 +123,7 @@ async fn test_hdfs_integration_with_history_provider() -> Result<()> {
         compression_enabled: true,
         database_directory: None,
         hdfs: None,
+        s3: None,
     };
 
     println!("✅ HDFS integration with HistoryProvider test setup completed");

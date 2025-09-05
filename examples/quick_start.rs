@@ -24,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             compression_enabled: true,
             database_directory: None,
             hdfs: None,
+            s3: None,
         },
     };
 

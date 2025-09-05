@@ -26,8 +26,14 @@ pub struct HistoryProvider {
 
 impl HistoryProvider {
     pub async fn new(config: HistoryConfig) -> Result<Self> {
-        let file_reader: Arc<dyn FileReader> =
-            Arc::from(create_file_reader(&config.log_directory, config.hdfs.as_ref()).await?);
+        let file_reader: Arc<dyn FileReader> = Arc::from(
+            create_file_reader(
+                &config.log_directory,
+                config.hdfs.as_ref(),
+                config.s3.as_ref(),
+            )
+            .await?,
+        );
         let event_parser = EventLogParser::new();
 
         // Initialize DuckDB store
@@ -152,8 +158,8 @@ impl HistoryProvider {
     async fn scan_event_logs_internal(&self) -> Result<()> {
         let log_dir = Path::new(&self.config.log_directory);
 
-        // For HDFS, we don't check if directory exists locally
-        if self.config.hdfs.is_none() && !log_dir.exists() {
+        // For HDFS and S3, we don't check if directory exists locally
+        if self.config.hdfs.is_none() && self.config.s3.is_none() && !log_dir.exists() {
             return Err(anyhow!(
                 "Log directory does not exist: {}",
                 self.config.log_directory
