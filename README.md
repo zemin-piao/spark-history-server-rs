@@ -19,7 +19,7 @@ A **high-performance, analytics-first** Spark History Server built in Rust. Unli
 - **Resource optimization**: Identify underutilized executors and memory bottlenecks across your entire Spark estate
 
 ### ✅ **Enterprise-Ready Infrastructure**
-- **Real HDFS integration** with Kerberos authentication
+- **Multi-storage support**: Local filesystem, HDFS with Kerberos, and S3-compatible storage
 - **DuckDB analytical backend** for lightning-fast aggregations
 - **Circuit breaker protection** for fault-tolerant operations
 - **Single binary deployment** - no external dependencies
@@ -46,6 +46,13 @@ cargo build --release
 ./target/release/spark-history-server \
   --hdfs \
   --hdfs-namenode hdfs://namenode:9000 \
+  --log-directory /spark-events
+
+# With S3 storage
+./target/release/spark-history-server \
+  --s3 \
+  --s3-bucket my-spark-events \
+  --s3-region us-east-1 \
   --log-directory /spark-events
 
 # With Kerberos authentication
@@ -84,9 +91,10 @@ host = "0.0.0.0"
 port = 18080
 
 [history]
-# Local or HDFS path to Spark event logs
+# Local, HDFS, or S3 path to Spark event logs
 log_directory = "/tmp/spark-events"
 # or log_directory = "hdfs://namenode:9000/spark-events"
+# or log_directory = "s3://my-bucket/spark-events"
 
 max_applications = 1000
 update_interval_seconds = 60
@@ -102,11 +110,21 @@ read_timeout_ms = 60000
 [history.hdfs.kerberos]
 principal = "spark@EXAMPLE.COM" 
 keytab_path = "/etc/security/keytabs/spark.keytab"
+
+# Optional S3 configuration
+[history.s3]
+bucket_name = "my-spark-events"
+region = "us-east-1"
+# endpoint_url = "https://s3.amazonaws.com"  # For S3-compatible services like MinIO
+# access_key_id = "your-access-key"
+# secret_access_key = "your-secret-key"
+connection_timeout_ms = 30000
+read_timeout_ms = 60000
 ```
 
 ## 🏗️ Architecture
 
-- **Event Processing**: Real `hdfs-native` integration with circuit breaker protection
+- **Event Processing**: Multi-storage support (local, HDFS, S3) with circuit breaker protection
 - **Storage**: DuckDB embedded analytical database optimized for cross-app queries
 - **APIs**: Dual support for standard Spark History Server v1 + advanced analytics
 - **Dashboard**: Built-in web interface with multiple analytical views
@@ -119,6 +137,9 @@ cargo test
 
 # HDFS integration tests  
 ./scripts/run-hdfs-tests.sh
+
+# S3 integration tests
+cargo test --test s3_integration_test
 
 # Performance testing
 cargo test test_100k_applications_load --release
