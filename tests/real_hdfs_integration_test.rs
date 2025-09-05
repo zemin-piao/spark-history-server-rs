@@ -330,6 +330,9 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     println!("========================================");
     println!();
 
+    // Create a temporary directory for database
+    let temp_dir = tempfile::TempDir::new()?;
+
     let spark_events_dir =
         std::env::var("SPARK_EVENTS_DIR").unwrap_or_else(|_| "/spark-events".to_string());
 
@@ -345,8 +348,7 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
         update_interval_seconds: 300, // 5 minutes for testing
         max_apps_per_request: 50,
         compression_enabled: true,
-        cache_directory: Some("./test-cache".to_string()),
-        enable_cache: false, // Disable cache for testing
+        database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config),
     };
 

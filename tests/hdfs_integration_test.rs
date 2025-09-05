@@ -121,8 +121,7 @@ async fn test_hdfs_integration_with_history_provider() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
-        cache_directory: None,
-        enable_cache: false,
+        database_directory: None,
         hdfs: None,
     };
 

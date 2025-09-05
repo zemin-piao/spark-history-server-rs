@@ -369,8 +369,7 @@ async fn test_history_provider_hdfs_integration() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
-        cache_directory: Some(temp_dir.path().join("cache").to_string_lossy().to_string()),
-        enable_cache: false,
+        database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config),
     };
 

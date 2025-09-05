@@ -3,9 +3,34 @@ use serde_json::json;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 
-use spark_history_server::{
-    hdfs_reader::HdfsReader, spark_events::SparkEvent, storage::duckdb_store::DuckDbStore,
-};
+use spark_history_server::{spark_events::SparkEvent, storage::duckdb_store::DuckDbStore};
+
+/// Helper function to parse events from file content (for testing without HDFS)
+fn parse_events_from_content(content: &str, app_id: &str) -> Result<Vec<SparkEvent>> {
+    let mut events = Vec::new();
+
+    for line in content.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        match serde_json::from_str::<serde_json::Value>(line) {
+            Ok(json) => match SparkEvent::from_json(&json, app_id) {
+                Ok(event) => events.push(event),
+                Err(e) => {
+                    println!("Warning: Failed to parse event: {}", e);
+                    continue;
+                }
+            },
+            Err(e) => {
+                println!("Warning: Failed to parse JSON: {}", e);
+                continue;
+            }
+        }
+    }
+
+    Ok(events)
+}
 
 /// Test helper to create a sample Spark event JSON
 fn create_sample_event_json(app_id: &str, event_type: &str, timestamp: i64) -> String {
@@ -91,11 +116,9 @@ async fn test_hdfs_to_duckdb_pipeline() -> Result<()> {
     }
     tokio::fs::write(&event_file, content).await?;
 
-    // Create HDFS reader and read events
-    let hdfs_reader = HdfsReader::new("", &hdfs_path.to_string_lossy()).await?;
-    let events = hdfs_reader
-        .read_events(&event_file.to_string_lossy(), app_id)
-        .await?;
+    // Read events from local file
+    let file_content = tokio::fs::read_to_string(&event_file).await?;
+    let events = parse_events_from_content(&file_content, app_id)?;
 
     println!("HDFS reader found {} events", events.len());
     assert_eq!(events.len(), 3, "Should read 3 events from file");
@@ -212,13 +235,9 @@ async fn test_batch_writer_simulation() -> Result<()> {
         println!("Batch writer finished");
     });
 
-    // Read events from both files and send to batch writer
-    let hdfs_reader = HdfsReader::new("", &hdfs_path.to_string_lossy()).await?;
-
     // Process first file
-    let events1 = hdfs_reader
-        .read_events(&event_file_1.to_string_lossy(), app_id)
-        .await?;
+    let file1_content = tokio::fs::read_to_string(&event_file_1).await?;
+    let events1 = parse_events_from_content(&file1_content, app_id)?;
     println!("Sending {} events from file 1", events1.len());
     for event in events1 {
         event_tx
@@ -227,9 +246,8 @@ async fn test_batch_writer_simulation() -> Result<()> {
     }
 
     // Process second file
-    let events2 = hdfs_reader
-        .read_events(&event_file_2.to_string_lossy(), app_id)
-        .await?;
+    let file2_content = tokio::fs::read_to_string(&event_file_2).await?;
+    let events2 = parse_events_from_content(&file2_content, app_id)?;
     println!("Sending {} events from file 2", events2.len());
     for event in events2 {
         event_tx

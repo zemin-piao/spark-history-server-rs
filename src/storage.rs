@@ -8,15 +8,13 @@ use tracing::{debug, error, info, warn};
 use crate::config::HistoryConfig;
 use crate::models::{ApplicationInfo, ApplicationStatus};
 
+pub mod duckdb_store;
 mod event_log;
 pub mod file_reader;
-// pub mod hybrid_store;  // Temporarily disabled
-pub mod duckdb_store;
 
+pub use duckdb_store::DuckDbStore;
 use event_log::EventLogParser;
 pub use file_reader::{create_file_reader, FileReader};
-// pub use hybrid_store::{ApplicationStore, HybridStore, InMemoryStore, RocksDbStore};  // Temporarily disabled
-pub use duckdb_store::DuckDbStore;
 
 /// History provider that manages Spark application history
 pub struct HistoryProvider {
@@ -33,9 +31,9 @@ impl HistoryProvider {
         let event_parser = EventLogParser::new();
 
         // Initialize DuckDB store
-        let cache_dir = config.cache_directory.as_deref().unwrap_or("./data");
-        std::fs::create_dir_all(cache_dir)?;
-        let db_path = std::path::Path::new(cache_dir).join("spark_events.duckdb");
+        let db_dir = config.database_directory.as_deref().unwrap_or("./data");
+        std::fs::create_dir_all(db_dir)?;
+        let db_path = std::path::Path::new(db_dir).join("spark_events.duckdb");
         let store = DuckDbStore::new(&db_path).await?;
 
         let provider = Self {

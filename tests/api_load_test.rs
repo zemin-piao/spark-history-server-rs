@@ -102,8 +102,7 @@ async fn setup_test_server_with_data(num_events: usize) -> (String, TempDir) {
         update_interval_seconds: 60,
         max_apps_per_request: 100,
         compression_enabled: true,
-        cache_directory: Some(temp_dir.path().to_string_lossy().to_string()),
-        enable_cache: false, // Disable cache for testing
+        database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None,
     };
 

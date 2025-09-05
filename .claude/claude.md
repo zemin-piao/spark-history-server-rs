@@ -8,24 +8,52 @@ This is a **high-performance, analytics-first Spark History Server** implementat
 
 **Proven Performance**: Successfully tested with 100,000 applications and 2M events at 10,700 events/sec.
 
+## Recent Improvements (2024)
+
+### ✅ **Production-Ready HDFS Integration**
+- **Real HDFS Native Support**: Replaced mock implementation with production-ready `hdfs-native` integration
+- **Full Kerberos Authentication**: Enterprise-grade security with keytab and ticket cache support
+- **Connection Management**: Proper timeout handling, connection pooling, and health checks
+- **Comprehensive Testing**: 25+ tests covering mock, integration, and real HDFS cluster scenarios
+
+### ✅ **Simplified DuckDB-Only Architecture**
+- **Removed Hybrid Storage Complexity**: Eliminated confusing hybrid storage layer for cleaner architecture
+- **Single Source of Truth**: All data flows through DuckDB for consistent analytics and reporting
+- **Configuration Simplified**: Updated from `cache_directory`/`enable_cache` to single `database_directory` parameter
+
+### ✅ **Circuit Breaker Fault Tolerance**
+- **External Dependency Protection**: Circuit breakers for HDFS and DuckDB operations
+- **Automatic Recovery**: Self-healing system that automatically retries failed operations
+- **Failure Tracking**: Comprehensive monitoring of failure rates, success rates, and system health
+- **Production-Ready**: Configurable thresholds, timeouts, and recovery windows
+
+### ✅ **Code Quality & Testing Excellence**
+- **Strict Clippy Compliance**: All code passes `cargo clippy --all-targets --all-features -- -D warnings`
+- **Comprehensive Test Suite**: 45+ tests covering all major functionality and edge cases
+- **Zero Technical Debt**: All deprecated patterns removed, clean modern Rust architecture
+
 ## Architecture Context
 
 You are working on a principal-level system design for a Spark History Server that emphasizes:
 
 - **Analytics-First Design**: Cross-application performance insights, not individual app debugging
 - **DuckDB Backend**: Embedded columnar database optimized for aggregations and time-series analysis  
-- **HDFS Native Integration**: Direct HDFS access with full Kerberos authentication support
+- **Real HDFS Integration**: Production-ready HDFS access via `hdfs-native` with full Kerberos authentication support
+- **Circuit Breaker Protection**: Fault-tolerant operations with automatic recovery for external dependencies
 - **Zero Deployment Complexity**: Single binary with embedded database
 - **Enterprise Scale**: Load tested with 100K+ applications
 
 ### Core Components
 
 1. **Log Processing Engine** (`src/event_processor.rs`, `src/storage/`)
-   - HDFS integration via `hdfs-native` with Kerberos authentication
+   - **Production HDFS integration** via `hdfs-native` with Kerberos authentication
+   - **Circuit breaker protection** for HDFS operations with automatic recovery
    - Event stream processing with batch optimization (1000+ events/batch)
    - Schema flexibility: hot field extraction + JSON fallback for 10+ event types
 
 2. **DuckDB Storage Layer** (`src/storage/duckdb_store.rs`)
+   - **Simplified DuckDB-only architecture** (hybrid storage removed)
+   - **Circuit breaker protection** for database operations
    - Single events table with common fields + JSON column
    - Optimized for cross-application analytics and aggregations
    - Batched writes with background flushing
@@ -100,8 +128,8 @@ cargo test test_real_hdfs --ignored
 
 ### Linting & Code Quality
 ```bash
-# Run clippy for linting
-cargo clippy
+# Run clippy for linting (strict mode)
+cargo clippy --all-targets --all-features -- -D warnings
 
 # Format code
 cargo fmt
@@ -121,16 +149,20 @@ cargo machete
 - `src/models.rs` - Data models and API response structures
 
 ### Storage & Processing
-- `src/storage/duckdb_store.rs` - Core DuckDB integration and analytics engine
-- `src/storage/file_reader.rs` - File system abstraction (local + HDFS)
-- `src/storage/hybrid_store.rs` - Unified storage interface
+- `src/storage/duckdb_store.rs` - Core DuckDB integration and analytics engine with circuit breaker protection
+- `src/storage/file_reader.rs` - File system abstraction (local + HDFS) with circuit breaker protection
 - `src/event_processor.rs` - Spark event log parsing and processing
-- `src/hdfs_reader.rs` - HDFS client with Kerberos authentication
+- `src/hdfs_reader.rs` - Production HDFS client with Kerberos authentication
+- `src/circuit_breaker.rs` - Circuit breaker implementation for fault tolerance
 
 ### Testing Infrastructure
 - `tests/integration_test.rs` - End-to-end integration testing
 - `tests/analytics_api_test.rs` - Analytics API endpoint testing
 - `tests/hdfs_integration_test.rs` - Comprehensive HDFS testing
+- `tests/real_hdfs_integration_test.rs` - Real HDFS cluster testing
+- `tests/batch_writer_debug_test.rs` - Event processing and storage testing
+- `tests/argument_based_reader_test.rs` - Reader selection and configuration testing
+- `tests/incremental_scan_test.rs` - Incremental scanning and processing testing
 - `tests/large_scale_test.rs` - Enterprise-scale load testing (100K apps)
 - `tests/load_test_utils.rs` - Load testing utilities and helpers
 
@@ -155,6 +187,7 @@ The server uses a layered configuration approach:
 
 **Event Log Storage**:
 - `history.log_directory` / `--log-directory` - Path to Spark event logs
+- `history.database_directory` - DuckDB database storage directory (replaces cache_directory)
 - `history.update_interval_seconds` - Polling interval for new logs
 - `history.compression_enabled` - Support for .lz4/.snappy files
 

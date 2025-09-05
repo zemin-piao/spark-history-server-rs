@@ -5,7 +5,8 @@ use tokio::sync::mpsc;
 use tokio::time::{interval, sleep, Duration};
 use tracing::{debug, error, info, warn};
 
-use crate::hdfs_reader::{FileMetadata, HdfsConfig, HdfsReader};
+use crate::config::HdfsConfig;
+use crate::hdfs_reader::{FileMetadata, HdfsReader};
 use crate::metadata_store::MetadataStore;
 use crate::spark_events::SparkEvent;
 use crate::storage::duckdb_store::{DuckDbStore, SparkEvent as DbSparkEvent};
@@ -15,6 +16,7 @@ pub struct EventProcessor {
     hdfs_reader: Arc<HdfsReader>,
     duckdb_store: Arc<DuckDbStore>,
     metadata_store: Arc<MetadataStore>,
+    base_path: String,
     batch_size: usize,
     flush_interval_secs: u64,
     scan_interval_secs: u64,
@@ -24,6 +26,7 @@ impl EventProcessor {
     /// Create a new event processor
     pub async fn new(
         hdfs_config: HdfsConfig,
+        base_path: String,
         duckdb_path: &Path,
         metadata_path: &Path,
         batch_size: usize,
@@ -31,6 +34,7 @@ impl EventProcessor {
     ) -> Result<Self> {
         Self::new_with_scan_interval(
             hdfs_config,
+            base_path,
             duckdb_path,
             metadata_path,
             batch_size,
@@ -43,14 +47,14 @@ impl EventProcessor {
     /// Create a new event processor with custom scan interval (useful for testing)
     pub async fn new_with_scan_interval(
         hdfs_config: HdfsConfig,
+        base_path: String,
         duckdb_path: &Path,
         metadata_path: &Path,
         batch_size: usize,
         flush_interval_secs: u64,
         scan_interval_secs: u64,
     ) -> Result<Self> {
-        let hdfs_reader =
-            Arc::new(HdfsReader::new(&hdfs_config.namenode_uri, &hdfs_config.base_path).await?);
+        let hdfs_reader = Arc::new(HdfsReader::new(&hdfs_config.namenode_url, &base_path).await?);
 
         let duckdb_store = Arc::new(DuckDbStore::new(duckdb_path).await?);
         let metadata_store = Arc::new(MetadataStore::new(metadata_path).await?);
@@ -59,6 +63,7 @@ impl EventProcessor {
             hdfs_reader,
             duckdb_store,
             metadata_store,
+            base_path,
             batch_size,
             flush_interval_secs,
             scan_interval_secs,
@@ -104,7 +109,7 @@ impl EventProcessor {
     /// Perform an incremental scan checking only changed files
     async fn incremental_scan(&self, event_tx: &mpsc::UnboundedSender<SparkEvent>) -> Result<()> {
         let start_time = std::time::Instant::now();
-        let applications = self.hdfs_reader.list_applications().await?;
+        let applications = self.hdfs_reader.list_applications(&self.base_path).await?;
         let app_count = applications.len();
 
         info!("Incremental scan starting for {} applications", app_count);
@@ -112,7 +117,11 @@ impl EventProcessor {
         let mut files_processed = 0;
 
         for app_id in applications {
-            match self.hdfs_reader.list_event_files(&app_id).await {
+            match self
+                .hdfs_reader
+                .list_event_files(&self.base_path, &app_id)
+                .await
+            {
                 Ok(event_files) => {
                     for file_path in event_files {
                         // Get current file info
@@ -197,6 +206,7 @@ impl EventProcessor {
         let metadata_store = Arc::clone(&self.metadata_store);
         let hdfs_reader = Arc::clone(&self.hdfs_reader);
         let scan_interval_secs = self.scan_interval_secs;
+        let base_path = self.base_path.clone();
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(scan_interval_secs));
@@ -206,8 +216,13 @@ impl EventProcessor {
 
                 debug!("Starting periodic incremental scan");
 
-                if let Err(e) =
-                    Self::perform_incremental_scan(&hdfs_reader, &metadata_store, &event_tx).await
+                if let Err(e) = Self::perform_incremental_scan(
+                    &hdfs_reader,
+                    &metadata_store,
+                    &event_tx,
+                    &base_path,
+                )
+                .await
                 {
                     error!("Periodic incremental scan failed: {}", e);
                 }
@@ -220,15 +235,16 @@ impl EventProcessor {
         hdfs_reader: &Arc<HdfsReader>,
         metadata_store: &Arc<MetadataStore>,
         event_tx: &mpsc::UnboundedSender<SparkEvent>,
+        log_directory: &str,
     ) -> Result<()> {
         let start_time = std::time::Instant::now();
-        let applications = hdfs_reader.list_applications().await?;
+        let applications = hdfs_reader.list_applications(log_directory).await?;
         let mut total_events = 0;
         let mut files_checked = 0;
         let mut files_processed = 0;
 
         for app_id in applications {
-            match hdfs_reader.list_event_files(&app_id).await {
+            match hdfs_reader.list_event_files(log_directory, &app_id).await {
                 Ok(event_files) => {
                     for file_path in event_files {
                         files_checked += 1;

@@ -149,8 +149,7 @@ async fn test_history_provider_with_local_reader() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
-        cache_directory: Some(temp_dir.path().join("cache").to_string_lossy().to_string()),
-        enable_cache: false,
+        database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None, // This forces local file reader selection
     };
 
@@ -194,8 +193,7 @@ async fn test_history_provider_with_hdfs_config() -> Result<()> {
         update_interval_seconds: 60,
         max_apps_per_request: 50,
         compression_enabled: true,
-        cache_directory: Some(temp_dir.path().join("cache").to_string_lossy().to_string()),
-        enable_cache: false,
+        database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config), // This forces HDFS file reader selection
     };
 
@@ -273,6 +271,9 @@ async fn test_runtime_reader_switching() -> Result<()> {
 async fn test_configuration_precedence() -> Result<()> {
     println!("Testing configuration precedence (CLI args vs config file vs defaults)...");
 
+    // Create a temporary directory for database
+    let temp_dir = TempDir::new()?;
+
     // Test default configuration (no HDFS)
     let default_config = HistoryConfig {
         log_directory: "./test-data/spark-events".to_string(),
@@ -280,8 +281,7 @@ async fn test_configuration_precedence() -> Result<()> {
         update_interval_seconds: 10,
         max_apps_per_request: 100,
         compression_enabled: true,
-        cache_directory: Some("./cache/rocksdb".to_string()),
-        enable_cache: true,
+        database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None,
     };
 
@@ -295,8 +295,7 @@ async fn test_configuration_precedence() -> Result<()> {
         update_interval_seconds: 10,
         max_apps_per_request: 100,
         compression_enabled: true,
-        cache_directory: Some("./cache/rocksdb".to_string()),
-        enable_cache: true,
+        database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(HdfsConfig {
             namenode_url: "hdfs://override-namenode:9000".to_string(),
             connection_timeout_ms: Some(15000),

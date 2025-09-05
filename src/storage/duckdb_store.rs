@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use duckdb::{params, Connection};
 use serde_json::Value;
 use std::path::Path;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
@@ -9,11 +10,13 @@ use crate::analytics_api::{
     CapacityTrend, CostOptimization, DifficultyLevel, EfficiencyAnalysis, EfficiencyCategory,
     OptimizationType, ResourceHog, ResourceType, RiskLevel,
 };
+use crate::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
 use crate::models::ApplicationInfo;
 
 /// DuckDB-based storage for Spark events with analytics capabilities
 pub struct DuckDbStore {
     connection: Mutex<Connection>,
+    circuit_breaker: Arc<CircuitBreaker>,
 }
 
 impl DuckDbStore {
@@ -101,8 +104,21 @@ impl DuckDbStore {
 
         info!("DuckDB initialized at: {:?}", db_path);
 
+        // Create circuit breaker for DuckDB operations
+        let circuit_breaker_config = CircuitBreakerConfig {
+            failure_threshold: 5,
+            success_threshold: 3,
+            timeout_duration: std::time::Duration::from_secs(10),
+            window_duration: std::time::Duration::from_secs(60),
+        };
+        let circuit_breaker = Arc::new(CircuitBreaker::new(
+            format!("duckdb-{}", db_path.display()),
+            circuit_breaker_config,
+        ));
+
         Ok(Self {
             connection: Mutex::new(conn),
+            circuit_breaker,
         })
     }
 
@@ -112,80 +128,115 @@ impl DuckDbStore {
             return Ok(());
         }
 
-        let conn = self.connection.lock().await;
-        let mut stmt = conn.prepare(
-            r#"
-            INSERT INTO events (
-                id, app_id, event_type, timestamp, raw_data, 
-                job_id, stage_id, task_id, duration_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
-        )?;
+        let result = self
+            .circuit_breaker
+            .call(async {
+                let conn = self.connection.lock().await;
+                let mut stmt = conn
+                    .prepare(
+                        r#"
+                INSERT INTO events (
+                    id, app_id, event_type, timestamp, raw_data, 
+                    job_id, stage_id, task_id, duration_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                    )
+                    .map_err(|e| anyhow!("Failed to prepare statement: {}", e))?;
 
-        // Use transaction for batch insert
-        let transaction_result = (|| -> Result<()> {
-            conn.execute_batch("BEGIN TRANSACTION")?;
+                // Use transaction for batch insert
+                let transaction_result = (|| -> Result<()> {
+                    conn.execute_batch("BEGIN TRANSACTION")?;
 
-            for event in &events {
-                stmt.execute(params![
-                    event.id,
-                    &event.app_id,
-                    &event.event_type,
-                    &event.timestamp,
-                    &event.raw_data.to_string(),
-                    event.job_id,
-                    event.stage_id,
-                    event.task_id,
-                    event.duration_ms,
-                ])?;
+                    for event in &events {
+                        stmt.execute(params![
+                            event.id,
+                            &event.app_id,
+                            &event.event_type,
+                            &event.timestamp,
+                            &event.raw_data.to_string(),
+                            event.job_id,
+                            event.stage_id,
+                            event.task_id,
+                            event.duration_ms,
+                        ])?;
+                    }
+
+                    conn.execute_batch("COMMIT")?;
+                    Ok(())
+                })();
+
+                if let Err(e) = transaction_result {
+                    // Rollback on any error
+                    if let Err(rollback_err) = conn.execute_batch("ROLLBACK") {
+                        warn!("Failed to rollback transaction: {}", rollback_err);
+                    }
+                    return Err(e);
+                }
+
+                debug!("Inserted {} events into DuckDB", events.len());
+                Ok(())
+            })
+            .await;
+
+        match result {
+            Ok(db_result) => Ok(db_result),
+            Err(e) => {
+                if e.is_circuit_open() {
+                    Err(anyhow!("Database insert failed: circuit breaker is open"))
+                } else {
+                    Err(e
+                        .into_inner()
+                        .unwrap_or_else(|| anyhow!("Unknown database error")))
+                }
             }
-
-            conn.execute_batch("COMMIT")?;
-            Ok(())
-        })();
-
-        if let Err(e) = transaction_result {
-            // Rollback on any error
-            if let Err(rollback_err) = conn.execute_batch("ROLLBACK") {
-                warn!("Failed to rollback transaction: {}", rollback_err);
-            }
-            return Err(e);
         }
-
-        debug!("Inserted {} events into DuckDB", events.len());
-        Ok(())
     }
 
     /// Get cross-application summary statistics
     pub async fn get_cross_app_summary(&self) -> Result<crate::dashboard::SimpleCrossAppSummary> {
-        let conn = self.connection.lock().await;
+        let result = self.circuit_breaker.call(async {
+            let conn = self.connection.lock().await;
 
-        let mut stmt = conn.prepare(r#"
-            SELECT 
-                COUNT(DISTINCT app_id) as total_applications,
-                COUNT(DISTINCT CASE WHEN CAST(timestamp AS TIMESTAMP) >= CURRENT_TIMESTAMP::TIMESTAMP - '1 day'::INTERVAL THEN app_id END) as active_applications,
-                COUNT(*) as total_events,
-                COUNT(CASE WHEN event_type = 'SparkListenerTaskEnd' THEN 1 END) as total_tasks_completed,
-                COUNT(CASE WHEN event_type = 'SparkListenerTaskEnd' AND raw_data LIKE '%"failed":true%' THEN 1 END) as total_tasks_failed,
-                COALESCE(AVG(duration_ms), 0) as avg_task_duration_ms,
-                0 as peak_concurrent_executors
-            FROM events
-        "#)?;
+            let mut stmt = conn.prepare(r#"
+                SELECT 
+                    COUNT(DISTINCT app_id) as total_applications,
+                    COUNT(DISTINCT CASE WHEN CAST(timestamp AS TIMESTAMP) >= CURRENT_TIMESTAMP::TIMESTAMP - '1 day'::INTERVAL THEN app_id END) as active_applications,
+                    COUNT(*) as total_events,
+                    COUNT(CASE WHEN event_type = 'SparkListenerTaskEnd' THEN 1 END) as total_tasks_completed,
+                    COUNT(CASE WHEN event_type = 'SparkListenerTaskEnd' AND raw_data LIKE '%"failed":true%' THEN 1 END) as total_tasks_failed,
+                    COALESCE(AVG(duration_ms), 0) as avg_task_duration_ms,
+                    0 as peak_concurrent_executors
+                FROM events
+            "#).map_err(|e| anyhow!("Failed to prepare summary query: {}", e))?;
 
-        let row = stmt.query_row(params![], |row| {
-            Ok(crate::dashboard::SimpleCrossAppSummary {
-                total_applications: row.get::<_, i64>(0)?,
-                active_applications: row.get::<_, i64>(1)?,
-                total_events: row.get::<_, i64>(2)?,
-                total_tasks_completed: row.get::<_, i64>(3)?,
-                total_tasks_failed: row.get::<_, i64>(4)?,
-                avg_task_duration_ms: format!("{:.0}", row.get::<_, f64>(5)?),
-                total_data_processed_gb: "0".to_string(), // TODO: calculate from events
-                peak_concurrent_executors: row.get::<_, i64>(6)?,
-            })
-        })?;
+            let row = stmt.query_row(params![], |row| {
+                Ok(crate::dashboard::SimpleCrossAppSummary {
+                    total_applications: row.get::<_, i64>(0)?,
+                    active_applications: row.get::<_, i64>(1)?,
+                    total_events: row.get::<_, i64>(2)?,
+                    total_tasks_completed: row.get::<_, i64>(3)?,
+                    total_tasks_failed: row.get::<_, i64>(4)?,
+                    avg_task_duration_ms: format!("{:.0}", row.get::<_, f64>(5)?),
+                    total_data_processed_gb: "0".to_string(), // TODO: calculate from events
+                    peak_concurrent_executors: row.get::<_, i64>(6)?,
+                })
+            }).map_err(|e| anyhow!("Failed to execute summary query: {}", e))?;
 
-        Ok(row)
+            Ok(row)
+        }).await;
+
+        match result {
+            Ok(summary) => Ok(summary),
+            Err(e) => {
+                if e.is_circuit_open() {
+                    Err(anyhow!("Database query failed: circuit breaker is open"))
+                } else {
+                    Err(e
+                        .into_inner()
+                        .unwrap_or_else(|| anyhow!("Unknown database error")))
+                }
+            }
+        }
     }
 
     /// Get active applications summary for dashboard

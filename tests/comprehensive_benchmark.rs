@@ -393,8 +393,7 @@ impl ComprehensiveBenchmark {
             update_interval_seconds: 60,
             max_apps_per_request: 100,
             compression_enabled: true,
-            cache_directory: Some(temp_dir.path().to_string_lossy().to_string()),
-            enable_cache: false,
+            database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
             hdfs: None,
         };
 

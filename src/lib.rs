@@ -1,5 +1,6 @@
 pub mod analytics_api;
 pub mod api;
+pub mod circuit_breaker;
 pub mod config;
 pub mod dashboard;
 pub mod event_processor;
