@@ -1,8 +1,8 @@
 [package]
 name = "spark-history-server"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
-authors = ["Your Name <you@example.com>"]
+authors = ["Zemin Piao <pzm6391@gmail.com>"]
 description = "A high-performance read-only Spark History Server API implementation in Rust"
 
 [dependencies]
