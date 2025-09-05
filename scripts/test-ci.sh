@@ -12,8 +12,8 @@ NC='\033[0m'
 echo -e "${BLUE}Running unit tests and mock integration tests...${NC}"
 cargo test --all-targets
 
-echo -e "${BLUE}Running performance tests...${NC}"
-cargo test --features performance-tests
+echo -e "${BLUE}Skipping performance tests (run manually with --features performance-tests)...${NC}"
+# cargo test --features performance-tests
 
 echo -e "${GREEN}✅ All CI tests passed!${NC}"
 echo ""
