@@ -146,7 +146,7 @@ mod real_s3_tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires real S3 infrastructure"]
+    #[cfg(feature = "integration-tests")]
     async fn test_real_s3_health_check() {
         let config = match get_test_s3_config() {
             Some(config) => config,
@@ -185,7 +185,7 @@ mod real_s3_tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires real S3 infrastructure"]
+    #[cfg(feature = "integration-tests")]
     async fn test_real_s3_list_directory() {
         let config = match get_test_s3_config() {
             Some(config) => config,
@@ -226,7 +226,7 @@ mod real_s3_tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires real S3 infrastructure with test data"]
+    #[cfg(feature = "integration-tests")]
     async fn test_real_s3_read_file() {
         let config = match get_test_s3_config() {
             Some(config) => config,
@@ -267,7 +267,7 @@ mod real_s3_tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires real S3 infrastructure"]
+    #[cfg(feature = "integration-tests")]
     async fn test_real_s3_file_exists() {
         let config = match get_test_s3_config() {
             Some(config) => config,

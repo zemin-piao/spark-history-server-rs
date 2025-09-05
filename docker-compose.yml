@@ -1,0 +1,83 @@
+services:
+  # MinIO S3-compatible storage
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: spark-history-minio
+    ports:
+      - "9000:9000"      # API port
+      - "9001:9001"      # Console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_DEFAULT_BUCKETS: spark-events,spark-logs
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+      - ./test-data:/test-data:ro  # Mount test data for easy upload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # HDFS Namenode
+  hdfs-namenode:
+    image: apache/hadoop:3
+    platform: linux/amd64
+    container_name: spark-history-hdfs-namenode
+    ports:
+      - "9870:9870"      # Namenode web UI
+      - "8020:8020"      # Namenode RPC
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      CORE_SITE_XML_fs_defaultFS: hdfs://hdfs-namenode:8020
+      HDFS_SITE_XML_dfs_replication: 1
+      HDFS_SITE_XML_dfs_namenode_rpc-address: hdfs-namenode:8020
+      HDFS_SITE_XML_dfs_namenode_http-address: 0.0.0.0:9870
+      HDFS_SITE_XML_dfs_datanode_data_dir: /tmp/hadoop-hdfs/dfs/data
+      HDFS_SITE_XML_dfs_namenode_name_dir: /tmp/hadoop-hdfs/dfs/name
+      HDFS_SITE_XML_dfs_namenode_checkpoint_dir: /tmp/hadoop-hdfs/dfs/namesecondary
+    command: ["hdfs", "namenode"]
+    volumes:
+      - namenode_data:/tmp/hadoop-hdfs/dfs/name
+      - ./test-data:/test-data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # HDFS Datanode
+  hdfs-datanode:
+    image: apache/hadoop:3
+    platform: linux/amd64
+    container_name: spark-history-hdfs-datanode
+    ports:
+      - "9864:9864"      # Datanode web UI
+      - "9866:9866"      # Datanode data transfer
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      CORE_SITE_XML_fs_defaultFS: hdfs://hdfs-namenode:8020
+      HDFS_SITE_XML_dfs_replication: 1
+      HDFS_SITE_XML_dfs_datanode_data_dir: /tmp/hadoop-hdfs/dfs/data
+      HDFS_SITE_XML_dfs_datanode_http-address: 0.0.0.0:9864
+      HDFS_SITE_XML_dfs_datanode_address: 0.0.0.0:9866
+      HDFS_SITE_XML_dfs_datanode_ipc_address: 0.0.0.0:9867
+    command: ["hdfs", "datanode"]
+    volumes:
+      - datanode_data:/tmp/hadoop-hdfs/dfs/data
+    depends_on:
+      - hdfs-namenode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9864"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  minio_data:
+    driver: local
+  namenode_data:
+    driver: local
+  datanode_data:
+    driver: local

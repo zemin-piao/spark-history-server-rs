@@ -1,0 +1,51 @@
+services:
+  # HDFS Namenode using a different approach for ARM64 compatibility
+  hdfs-namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: spark-history-hdfs-namenode
+    ports:
+      - "9870:9870"      # Namenode web UI
+      - "8020:8020"      # Namenode RPC
+    environment:
+      - CLUSTER_NAME=spark-history-hdfs
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:8020
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - HDFS_CONF_dfs_permissions_enabled=false
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+      - ./test-data:/test-data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+
+  # HDFS Datanode
+  hdfs-datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: spark-history-hdfs-datanode
+    ports:
+      - "9864:9864"      # Datanode web UI
+      - "9866:9866"      # Datanode data transfer
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:8020
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - HDFS_CONF_dfs_webhdfs_enabled=true  
+      - HDFS_CONF_dfs_permissions_enabled=false
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    depends_on:
+      - hdfs-namenode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9864"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+
+volumes:
+  namenode_data:
+    driver: local
+  datanode_data:
+    driver: local

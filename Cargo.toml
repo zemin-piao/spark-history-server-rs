@@ -74,6 +74,8 @@ rayon = "1.8"
 [features]
 default = []
 performance-tests = []
+integration-tests = []  # For tests requiring Docker containers
+docker-tests = []       # Alias for integration-tests
 
 [[bin]]
 name = "spark-history-server"

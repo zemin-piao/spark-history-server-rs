@@ -1,0 +1,25 @@
+services:
+  # MinIO S3-compatible storage
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: spark-history-minio
+    ports:
+      - "9000:9000"      # API port
+      - "9001:9001"      # Console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_DEFAULT_BUCKETS: spark-events,spark-logs
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+      - ./test-data:/test-data:ro  # Mount test data for easy upload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  minio_data:
+    driver: local

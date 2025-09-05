@@ -61,3 +61,14 @@ node_modules/
 # Temporary folders
 tmp/
 temp/
+
+# Local development tools (downloaded by scripts)
+mc
+minio
+./mc
+./minio
+
+# Database files
+*.duckdb
+*.duckdb.wal
+spark_events.duckdb*

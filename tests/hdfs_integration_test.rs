@@ -224,12 +224,12 @@ async fn test_hdfs_compression_support() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
+#[cfg(feature = "integration-tests")]
 async fn test_real_hdfs_connection() -> Result<()> {
     println!("Testing real HDFS connection (requires HDFS cluster)...");
 
     let namenode_url =
-        std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "hdfs://localhost:9000".to_string());
+        std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "hdfs://localhost:8020".to_string());
 
     let hdfs_reader = HdfsFileReader::new_simple(&namenode_url)?;
 
