@@ -59,34 +59,20 @@ cargo build --release
 
 ### 2. Access the Dashboard
 
-```bash
-# Web Dashboard
-open http://localhost:18080                     # Cluster overview
-open http://localhost:18080/optimize            # Resource optimization insights
+Open your browser and navigate to `http://localhost:18080` to access the web dashboard.
 
-# API Endpoints  
-curl "http://localhost:18080/api/v1/applications?limit=10"
-curl "http://localhost:18080/api/v1/analytics/cross-app-summary"
-curl "http://localhost:18080/api/v1/optimization/resource-hogs"
-```
+## 🎯 Key Features
 
-## 🎯 Key APIs & Features
+### 🎨 **Built-in Web Dashboard**
+- **Cluster Overview**: Real-time cluster status and key metrics at `http://localhost:18080`
+- **Optimization Dashboard**: Resource hogs, efficiency analysis, cost optimization at `http://localhost:18080/optimize`
+- **Performance Trends**: Historical analysis and capacity planning insights
 
-### 📊 **Analytics APIs** (Our Strength)
-- `GET /api/v1/analytics/cross-app-summary` - Enterprise-wide Spark metrics
-- `GET /api/v1/optimization/resource-hogs` - Top resource consuming applications
-- `GET /api/v1/optimization/efficiency-analysis` - Over/under-provisioned apps
-- `GET /api/v1/capacity/usage-trends` - Capacity planning insights
-
-### 📋 **Standard Spark History Server API v1** (Compatibility)
-- `GET /api/v1/applications` - Application listing with filtering
-- `GET /api/v1/applications/{appId}` - Application details  
-- `GET /api/v1/applications/{appId}/executors` - Executor information
-
-### 🎨 **Web Dashboard**
-- **Cluster Overview**: Real-time cluster status and key metrics
-- **Optimization Dashboard**: Resource hogs, efficiency analysis, cost optimization
-- **Performance Trends**: Historical analysis and capacity planning
+### 📊 **Cross-Application Analytics**
+- Enterprise-wide Spark metrics and performance analysis
+- Resource optimization and efficiency insights
+- Historical trends and capacity planning data
+- Standard Spark History Server API v1 compatibility
 
 ## ⚙️ Configuration
 
