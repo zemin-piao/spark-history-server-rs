@@ -1,10 +1,13 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,45 +15,45 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
-        
-    - name: Cache cargo dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        
-    - name: Check formatting
-      run: cargo fmt --all -- --check
-      
-    - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
-      
-    - name: Run CI test suite (no Docker dependencies)
-      run: |
-        chmod +x scripts/test-ci.sh
-        ./scripts/test-ci.sh
-      
-    - name: Build release
-      run: cargo build --release
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run CI test suite (no Docker dependencies)
+        run: |
+          chmod +x scripts/test-ci.sh
+          ./scripts/test-ci.sh
+
+      - name: Build release
+        run: cargo build --release
 
   # Optional: Integration tests with Docker (can be run manually or on schedule)
   integration-tests:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[run-integration]')
-    
+
     services:
       minio:
         image: quay.io/minio/minio:latest
@@ -65,7 +68,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          
+
       hdfs-namenode:
         image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
         ports:
@@ -73,44 +76,44 @@ jobs:
           - 9870:9870
         env:
           CLUSTER_NAME: test
-          
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-      
-    - name: Cache cargo dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        
-    - name: Wait for services
-      run: |
-        # Wait for MinIO
-        for i in {1..30}; do
-          if curl -f http://localhost:9000/minio/health/live; then break; fi
-          sleep 2
-        done
-        
-        # Wait for HDFS
-        for i in {1..60}; do
-          if curl -f http://localhost:9870; then break; fi
-          sleep 2
-        done
-        
-    - name: Run integration tests
-      run: |
-        export S3_TEST_BUCKET=spark-events
-        export AWS_ENDPOINT_URL=http://localhost:9000  
-        export AWS_ACCESS_KEY_ID=minioadmin
-        export AWS_SECRET_ACCESS_KEY=minioadmin123
-        export AWS_REGION=us-east-1
-        export HDFS_NAMENODE_URL=hdfs://localhost:8020
-        cargo test --features integration-tests
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Wait for services
+        run: |
+          # Wait for MinIO
+          for i in {1..30}; do
+            if curl -f http://localhost:9000/minio/health/live; then break; fi
+            sleep 2
+          done
+
+          # Wait for HDFS
+          for i in {1..60}; do
+            if curl -f http://localhost:9870; then break; fi
+            sleep 2
+          done
+
+      - name: Run integration tests
+        run: |
+          export S3_TEST_BUCKET=spark-events
+          export AWS_ENDPOINT_URL=http://localhost:9000
+          export AWS_ACCESS_KEY_ID=minioadmin
+          export AWS_SECRET_ACCESS_KEY=minioadmin123
+          export AWS_REGION=us-east-1
+          export HDFS_NAMENODE_URL=hdfs://localhost:8020
+          cargo test --features integration-tests
