@@ -267,3 +267,43 @@ async fn get_cost_optimization_opportunities(
         }
     }
 }
+
+/// Cross-application analytics summary
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CrossAppSummary {
+    pub total_applications: u64,
+    pub total_events: u64,
+    pub active_applications: u64,
+    pub average_duration_ms: f64,
+    pub total_cpu_time_ms: u64,
+    pub total_memory_used_bytes: u64,
+}
+
+/// Performance trend data point
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceTrend {
+    pub timestamp: i64,
+    pub metric_name: String,
+    pub metric_value: f64,
+    pub application_count: u32,
+}
+
+/// Resource usage summary across applications
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ResourceUsageSummary {
+    pub cpu_utilization_percent: f64,
+    pub memory_utilization_percent: f64,
+    pub total_executor_hours: f64,
+    pub peak_memory_usage_gb: f64,
+    pub average_task_duration_ms: f64,
+}
+
+/// Task distribution analysis
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TaskDistribution {
+    pub total_tasks: u64,
+    pub successful_tasks: u64,
+    pub failed_tasks: u64,
+    pub average_task_duration_ms: f64,
+    pub task_duration_percentiles: std::collections::HashMap<String, f64>,
+}

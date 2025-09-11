@@ -70,135 +70,186 @@ impl EventProcessor {
         })
     }
 
-    /// Start the event processing pipeline
+    /// Start the event processing pipeline with multi-writer architecture
     pub async fn start(&mut self) -> Result<()> {
+        let config = ProcessorConfig::default();
         info!(
-            "Starting event processor with batch_size={}, flush_interval={}s",
-            self.batch_size, self.flush_interval_secs
+            "Starting SCALABLE event processor: batch_size={}, flush_interval={}s, writers={}, concurrent_apps={}",
+            config.batch_size, config.flush_interval_secs, config.num_batch_writers, config.max_concurrent_apps
         );
 
-        // Create channels for batching
-        let (event_tx, event_rx) = mpsc::unbounded_channel::<SparkEvent>();
+        // Create multiple batch writers with load balancing
+        let mut writer_channels = Vec::new();
+        for writer_id in 0..config.num_batch_writers {
+            let (event_tx, event_rx) = mpsc::unbounded_channel::<SparkEvent>();
+            writer_channels.push(event_tx);
 
-        // Start batch writer task
-        let store_clone = Arc::clone(&self.duckdb_store);
-        let batch_size = self.batch_size;
-        let flush_interval = self.flush_interval_secs;
+            // Start each batch writer task
+            let store_clone = Arc::clone(&self.duckdb_store);
+            let batch_size = config.batch_size;
+            let flush_interval = config.flush_interval_secs;
 
+            tokio::spawn(async move {
+                info!("MULTI_WRITER: Starting batch writer {} with batch_size={}", writer_id, batch_size);
+                Self::batch_writer_task(store_clone, event_rx, batch_size, flush_interval, writer_id).await;
+            });
+        }
+
+        // Create load balancer for distributing events across writers
+        let (main_tx, mut main_rx) = mpsc::unbounded_channel::<SparkEvent>();
+        let writer_channels = Arc::new(writer_channels);
+        
         tokio::spawn(async move {
-            Self::batch_writer_task(store_clone, event_rx, batch_size, flush_interval).await;
+            let mut round_robin_counter = 0usize;
+            while let Some(event) = main_rx.recv().await {
+                let writer_id = round_robin_counter % config.num_batch_writers;
+                if let Some(writer_tx) = writer_channels.get(writer_id) {
+                    if let Err(e) = writer_tx.send(event) {
+                        error!("LOAD_BALANCER: Failed to send event to writer {}: {}", writer_id, e);
+                    }
+                }
+                round_robin_counter = round_robin_counter.wrapping_add(1);
+            }
+            warn!("LOAD_BALANCER: Main event channel closed");
         });
 
         // Start HDFS scanning task
         let hdfs_clone = Arc::clone(&self.hdfs_reader);
-
         tokio::spawn(async move {
             Self::hdfs_scanner_task(hdfs_clone).await;
         });
 
         // Initial incremental scan (will process new files)
         info!("Performing initial incremental scan of HDFS");
-        self.incremental_scan(&event_tx).await?;
+        self.incremental_scan(&main_tx).await?;
 
         // Start periodic incremental scans
-        self.start_incremental_scanner(event_tx).await;
+        self.start_incremental_scanner(main_tx).await;
 
         Ok(())
     }
 
-    /// Perform an incremental scan checking only changed files
+    /// Perform an incremental scan with parallel application processing
     async fn incremental_scan(&self, event_tx: &mpsc::UnboundedSender<SparkEvent>) -> Result<()> {
         let start_time = std::time::Instant::now();
         let applications = self.hdfs_reader.list_applications(&self.base_path).await?;
         let app_count = applications.len();
 
-        info!("Incremental scan starting for {} applications", app_count);
+        info!("PARALLEL incremental scan starting for {} applications", app_count);
+
+        // Create semaphore to limit concurrent application processing
+        let config = ProcessorConfig::default();
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(config.max_concurrent_apps));
+        
+        // Process applications in parallel with controlled concurrency
+        let mut handles = Vec::new();
+        
+        for app_id in applications {
+            let permit = semaphore.clone().acquire_owned().await?;
+            let hdfs_reader = Arc::clone(&self.hdfs_reader);
+            let metadata_store = Arc::clone(&self.metadata_store);
+            let event_tx = event_tx.clone();
+            let base_path = self.base_path.clone();
+            
+            let handle = tokio::spawn(async move {
+                let _permit = permit; // Hold permit for the duration
+                Self::process_application_parallel(hdfs_reader, metadata_store, event_tx, base_path, app_id).await
+            });
+            
+            handles.push(handle);
+        }
+
+        // Wait for all applications to complete and collect results
         let mut total_events = 0;
         let mut files_processed = 0;
-
-        for app_id in applications {
-            match self
-                .hdfs_reader
-                .list_event_files(&self.base_path, &app_id)
-                .await
-            {
-                Ok(event_files) => {
-                    for file_path in event_files {
-                        // Get current file info
-                        if let Ok(file_info) = self.hdfs_reader.get_file_info(&file_path).await {
-                            // Check if file should be reloaded based on size
-                            let should_reload = self
-                                .metadata_store
-                                .should_reload_file(&file_path, file_info.size)
-                                .await;
-                            debug!(
-                                "File: {} - Size: {}, Should reload: {}",
-                                file_path, file_info.size, should_reload
-                            );
-                            if should_reload {
-                                info!("Processing changed/new file: {}", file_path);
-
-                                match self.hdfs_reader.read_events(&file_path, &app_id).await {
-                                    Ok(events) => {
-                                        total_events += events.len();
-                                        files_processed += 1;
-
-                                        // Send events to batch writer
-                                        info!("INCREMENTAL: Sending {} events from {} to batch writer", events.len(), file_path);
-                                        for (i, event) in events.iter().enumerate() {
-                                            if let Err(e) = event_tx.send(event.clone()) {
-                                                error!(
-                                                    "Failed to send event {} to batch writer: {}",
-                                                    i, e
-                                                );
-                                            }
-                                        }
-                                        info!(
-                                            "INCREMENTAL: Finished sending events from {}",
-                                            file_path
-                                        );
-
-                                        // Update metadata for this file
-                                        let metadata = FileMetadata {
-                                            path: file_path.clone(),
-                                            last_processed: chrono::Utc::now().timestamp_millis(),
-                                            file_size: file_info.size,
-                                            last_index: None, // TODO: implement for rolling logs
-                                            is_complete: !file_path.ends_with(".inprogress"),
-                                        };
-
-                                        if let Err(e) =
-                                            self.metadata_store.update_metadata(metadata).await
-                                        {
-                                            error!(
-                                                "Failed to update metadata for {}: {}",
-                                                file_path, e
-                                            );
-                                        }
-                                    }
-                                    Err(e) => {
-                                        warn!("Failed to read events from {}: {}", file_path, e);
-                                    }
-                                }
-                            } else {
-                                debug!("Skipping unchanged file: {}", file_path);
-                            }
-                        }
-                    }
+        
+        for handle in handles {
+            match handle.await {
+                Ok(Ok((app_events, app_files))) => {
+                    total_events += app_events;
+                    files_processed += app_files;
+                }
+                Ok(Err(e)) => {
+                    warn!("Application processing failed: {}", e);
                 }
                 Err(e) => {
-                    warn!("Failed to list event files for {}: {}", app_id, e);
+                    error!("Task join error: {}", e);
                 }
             }
         }
 
         let duration = start_time.elapsed();
+        let throughput = total_events as f64 / duration.as_secs_f64();
         info!(
-            "Incremental scan completed: {} events from {} files ({} applications) in {:?}",
-            total_events, files_processed, app_count, duration
+            "PARALLEL incremental scan completed: {} events from {} files ({} applications) in {:?} ({:.0} events/sec)",
+            total_events, files_processed, app_count, duration, throughput
         );
 
         Ok(())
+    }
+
+    /// Process a single application's event files in parallel
+    async fn process_application_parallel(
+        hdfs_reader: Arc<HdfsReader>,
+        metadata_store: Arc<MetadataStore>,
+        event_tx: mpsc::UnboundedSender<SparkEvent>,
+        base_path: String,
+        app_id: String,
+    ) -> Result<(usize, usize)> {
+        let mut app_total_events = 0;
+        let mut app_files_processed = 0;
+
+        match hdfs_reader.list_event_files(&base_path, &app_id).await {
+            Ok(event_files) => {
+                // Process files for this application sequentially (to maintain event ordering)
+                for file_path in event_files {
+                    if let Ok(file_info) = hdfs_reader.get_file_info(&file_path).await {
+                        let should_reload = metadata_store
+                            .should_reload_file(&file_path, file_info.size)
+                            .await;
+                        
+                        if should_reload {
+                            debug!("PARALLEL: Processing changed/new file: {}", file_path);
+
+                            match hdfs_reader.read_events(&file_path, &app_id).await {
+                                Ok(events) => {
+                                    app_total_events += events.len();
+                                    app_files_processed += 1;
+
+                                    // Send events to load balancer
+                                    for event in events {
+                                        if let Err(e) = event_tx.send(event) {
+                                            error!("Failed to send event to load balancer: {}", e);
+                                        }
+                                    }
+
+                                    // Update metadata for this file
+                                    let metadata = FileMetadata {
+                                        path: file_path.clone(),
+                                        last_processed: chrono::Utc::now().timestamp_millis(),
+                                        file_size: file_info.size,
+                                        last_index: None,
+                                        is_complete: !file_path.ends_with(".inprogress"),
+                                    };
+
+                                    if let Err(e) = metadata_store.update_metadata(metadata).await {
+                                        error!("Failed to update metadata for {}: {}", file_path, e);
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("Failed to read events from {}: {}", file_path, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Failed to list event files for {}: {}", app_id, e);
+            }
+        }
+
+        Ok((app_total_events, app_files_processed))
     }
 
     /// Start incremental scanning for new/updated files
@@ -345,8 +396,9 @@ impl EventProcessor {
         mut event_rx: mpsc::UnboundedReceiver<SparkEvent>,
         batch_size: usize,
         flush_interval_secs: u64,
+        writer_id: usize,
     ) {
-        info!("Batch writer task started");
+        info!("Batch writer {} started with batch_size={}, flush_interval={}s", writer_id, batch_size, flush_interval_secs);
 
         let mut batch: Vec<DbSparkEvent> = Vec::with_capacity(batch_size);
         let mut flush_timer = interval(Duration::from_secs(flush_interval_secs));
@@ -360,7 +412,7 @@ impl EventProcessor {
                     match event_opt {
                         Some(event) => {
                             event_id_counter += 1;
-                            info!("BATCH_WRITER: Received event {} from app {}", event_id_counter, event.app_id);
+                            debug!("BATCH_WRITER_{}: Received event {} from app {}", writer_id, event_id_counter, event.app_id);
 
                             // Convert SparkEvent to DbSparkEvent
                             let db_event = DbSparkEvent {
@@ -376,18 +428,18 @@ impl EventProcessor {
                             };
 
                             batch.push(db_event);
-                            debug!("BATCH_WRITER: Added event to batch, batch size now: {}", batch.len());
+                            debug!("BATCH_WRITER_{}: Added event to batch, batch size now: {}", writer_id, batch.len());
 
                             // Flush if batch is full
                             if batch.len() >= batch_size {
-                                info!("BATCH_WRITER: Flushing full batch of {} events", batch.len());
-                                Self::flush_batch(&duckdb_store, &mut batch).await;
+                                info!("BATCH_WRITER_{}: Flushing full batch of {} events", writer_id, batch.len());
+                                Self::flush_batch(&duckdb_store, &mut batch, writer_id).await;
                             }
                         }
                         None => {
-                            warn!("Event channel closed, flushing remaining events");
+                            warn!("BATCH_WRITER_{}: Event channel closed, flushing remaining events", writer_id);
                             if !batch.is_empty() {
-                                Self::flush_batch(&duckdb_store, &mut batch).await;
+                                Self::flush_batch(&duckdb_store, &mut batch, writer_id).await;
                             }
                             break;
                         }
@@ -397,10 +449,10 @@ impl EventProcessor {
                 // Periodic flush timer
                 _ = flush_timer.tick() => {
                     if !batch.is_empty() {
-                        info!("BATCH_WRITER: Timer flush: {} events", batch.len());
-                        Self::flush_batch(&duckdb_store, &mut batch).await;
+                        info!("BATCH_WRITER_{}: Timer flush: {} events", writer_id, batch.len());
+                        Self::flush_batch(&duckdb_store, &mut batch, writer_id).await;
                     } else {
-                        debug!("BATCH_WRITER: Timer tick, but batch is empty");
+                        debug!("BATCH_WRITER_{}: Timer tick, but batch is empty", writer_id);
                     }
                 }
             }
@@ -408,7 +460,7 @@ impl EventProcessor {
     }
 
     /// Flush a batch of events to DuckDB
-    async fn flush_batch(duckdb_store: &Arc<DuckDbStore>, batch: &mut Vec<DbSparkEvent>) {
+    async fn flush_batch(duckdb_store: &Arc<DuckDbStore>, batch: &mut Vec<DbSparkEvent>, writer_id: usize) {
         if batch.is_empty() {
             return;
         }
@@ -419,15 +471,16 @@ impl EventProcessor {
         match duckdb_store.insert_events_batch(batch.clone()).await {
             Ok(()) => {
                 let duration = start_time.elapsed();
+                let throughput = batch_size as f64 / duration.as_secs_f64();
                 info!(
-                    "FLUSH_BATCH: Successfully flushed {} events to DuckDB in {:?}",
-                    batch_size, duration
+                    "FLUSH_BATCH_{}: Successfully flushed {} events to DuckDB in {:?} ({:.0} events/sec)",
+                    writer_id, batch_size, duration, throughput
                 );
             }
             Err(e) => {
                 error!(
-                    "FLUSH_BATCH: Failed to flush {} events to DuckDB: {}",
-                    batch_size, e
+                    "FLUSH_BATCH_{}: Failed to flush {} events to DuckDB: {}",
+                    writer_id, batch_size, e
                 );
                 // In production, might want to implement retry logic or dead letter queue
             }
@@ -469,15 +522,17 @@ pub struct ProcessorConfig {
     pub flush_interval_secs: u64,
     pub scan_interval_secs: u64,
     pub max_concurrent_apps: usize,
+    pub num_batch_writers: usize,
 }
 
 impl Default for ProcessorConfig {
     fn default() -> Self {
         Self {
-            batch_size: 1000,
-            flush_interval_secs: 30,
-            scan_interval_secs: 60,
-            max_concurrent_apps: 10,
+            batch_size: 5000,      // Increased for higher throughput
+            flush_interval_secs: 15, // Reduced for lower latency
+            scan_interval_secs: 30, // More frequent scanning
+            max_concurrent_apps: 50, // Increased parallelism
+            num_batch_writers: 8,   // Multiple writers
         }
     }
 }
