@@ -189,8 +189,7 @@ async fn get_top_resource_consumers(
 ) -> Result<Json<Vec<ResourceHog>>, StatusCode> {
     info!("GET /optimization/resource-hogs - params: {:?}", params);
 
-    let store = provider.get_duckdb_store();
-    match store.get_top_resource_consumers(&params).await {
+    match provider.get_resource_hogs(&params).await {
         Ok(resource_hogs) => {
             info!("Returning {} resource hogs", resource_hogs.len());
             Ok(Json(resource_hogs))
@@ -212,8 +211,7 @@ async fn get_efficiency_analysis(
         params
     );
 
-    let store = provider.get_duckdb_store();
-    match store.get_efficiency_analysis(&params).await {
+    match provider.get_efficiency_analysis(&params).await {
         Ok(analysis) => {
             info!("Returning {} efficiency analysis entries", analysis.len());
             Ok(Json(analysis))
@@ -229,11 +227,10 @@ async fn get_efficiency_analysis(
 async fn get_capacity_usage_trends(
     State(provider): State<HistoryProvider>,
     Query(params): Query<AnalyticsQuery>,
-) -> Result<Json<Vec<CapacityTrend>>, StatusCode> {
+) -> Result<Json<Vec<PerformanceTrend>>, StatusCode> {
     info!("GET /capacity/usage-trends - params: {:?}", params);
 
-    let store = provider.get_duckdb_store();
-    match store.get_capacity_usage_trends(&params).await {
+    match provider.get_performance_trends(&params).await {
         Ok(trends) => {
             info!("Returning {} capacity trend entries", trends.len());
             Ok(Json(trends))
@@ -249,16 +246,12 @@ async fn get_capacity_usage_trends(
 async fn get_cost_optimization_opportunities(
     State(provider): State<HistoryProvider>,
     Query(params): Query<AnalyticsQuery>,
-) -> Result<Json<Vec<CostOptimization>>, StatusCode> {
+) -> Result<Json<CostOptimization>, StatusCode> {
     info!("GET /capacity/cost-optimization - params: {:?}", params);
 
-    let store = provider.get_duckdb_store();
-    match store.get_cost_optimization_opportunities(&params).await {
+    match provider.get_cost_optimization(&params).await {
         Ok(opportunities) => {
-            info!(
-                "Returning {} cost optimization opportunities",
-                opportunities.len()
-            );
+            info!("Returning cost optimization data");
             Ok(Json(opportunities))
         }
         Err(e) => {

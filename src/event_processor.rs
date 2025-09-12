@@ -90,22 +90,35 @@ impl EventProcessor {
             let flush_interval = config.flush_interval_secs;
 
             tokio::spawn(async move {
-                info!("MULTI_WRITER: Starting batch writer {} with batch_size={}", writer_id, batch_size);
-                Self::batch_writer_task(store_clone, event_rx, batch_size, flush_interval, writer_id).await;
+                info!(
+                    "MULTI_WRITER: Starting batch writer {} with batch_size={}",
+                    writer_id, batch_size
+                );
+                Self::batch_writer_task(
+                    store_clone,
+                    event_rx,
+                    batch_size,
+                    flush_interval,
+                    writer_id,
+                )
+                .await;
             });
         }
 
         // Create load balancer for distributing events across writers
         let (main_tx, mut main_rx) = mpsc::unbounded_channel::<SparkEvent>();
         let writer_channels = Arc::new(writer_channels);
-        
+
         tokio::spawn(async move {
             let mut round_robin_counter = 0usize;
             while let Some(event) = main_rx.recv().await {
                 let writer_id = round_robin_counter % config.num_batch_writers;
                 if let Some(writer_tx) = writer_channels.get(writer_id) {
                     if let Err(e) = writer_tx.send(event) {
-                        error!("LOAD_BALANCER: Failed to send event to writer {}: {}", writer_id, e);
+                        error!(
+                            "LOAD_BALANCER: Failed to send event to writer {}: {}",
+                            writer_id, e
+                        );
                     }
                 }
                 round_robin_counter = round_robin_counter.wrapping_add(1);
@@ -135,34 +148,44 @@ impl EventProcessor {
         let applications = self.hdfs_reader.list_applications(&self.base_path).await?;
         let app_count = applications.len();
 
-        info!("PARALLEL incremental scan starting for {} applications", app_count);
+        info!(
+            "PARALLEL incremental scan starting for {} applications",
+            app_count
+        );
 
         // Create semaphore to limit concurrent application processing
         let config = ProcessorConfig::default();
         let semaphore = Arc::new(tokio::sync::Semaphore::new(config.max_concurrent_apps));
-        
+
         // Process applications in parallel with controlled concurrency
         let mut handles = Vec::new();
-        
+
         for app_id in applications {
             let permit = semaphore.clone().acquire_owned().await?;
             let hdfs_reader = Arc::clone(&self.hdfs_reader);
             let metadata_store = Arc::clone(&self.metadata_store);
             let event_tx = event_tx.clone();
             let base_path = self.base_path.clone();
-            
+
             let handle = tokio::spawn(async move {
                 let _permit = permit; // Hold permit for the duration
-                Self::process_application_parallel(hdfs_reader, metadata_store, event_tx, base_path, app_id).await
+                Self::process_application_parallel(
+                    hdfs_reader,
+                    metadata_store,
+                    event_tx,
+                    base_path,
+                    app_id,
+                )
+                .await
             });
-            
+
             handles.push(handle);
         }
 
         // Wait for all applications to complete and collect results
         let mut total_events = 0;
         let mut files_processed = 0;
-        
+
         for handle in handles {
             match handle.await {
                 Ok(Ok((app_events, app_files))) => {
@@ -207,7 +230,7 @@ impl EventProcessor {
                         let should_reload = metadata_store
                             .should_reload_file(&file_path, file_info.size)
                             .await;
-                        
+
                         if should_reload {
                             debug!("PARALLEL: Processing changed/new file: {}", file_path);
 
@@ -233,7 +256,10 @@ impl EventProcessor {
                                     };
 
                                     if let Err(e) = metadata_store.update_metadata(metadata).await {
-                                        error!("Failed to update metadata for {}: {}", file_path, e);
+                                        error!(
+                                            "Failed to update metadata for {}: {}",
+                                            file_path, e
+                                        );
                                     }
                                 }
                                 Err(e) => {
@@ -398,7 +424,10 @@ impl EventProcessor {
         flush_interval_secs: u64,
         writer_id: usize,
     ) {
-        info!("Batch writer {} started with batch_size={}, flush_interval={}s", writer_id, batch_size, flush_interval_secs);
+        info!(
+            "Batch writer {} started with batch_size={}, flush_interval={}s",
+            writer_id, batch_size, flush_interval_secs
+        );
 
         let mut batch: Vec<DbSparkEvent> = Vec::with_capacity(batch_size);
         let mut flush_timer = interval(Duration::from_secs(flush_interval_secs));
@@ -460,7 +489,11 @@ impl EventProcessor {
     }
 
     /// Flush a batch of events to DuckDB
-    async fn flush_batch(duckdb_store: &Arc<DuckDbStore>, batch: &mut Vec<DbSparkEvent>, writer_id: usize) {
+    async fn flush_batch(
+        duckdb_store: &Arc<DuckDbStore>,
+        batch: &mut Vec<DbSparkEvent>,
+        writer_id: usize,
+    ) {
         if batch.is_empty() {
             return;
         }
@@ -528,11 +561,11 @@ pub struct ProcessorConfig {
 impl Default for ProcessorConfig {
     fn default() -> Self {
         Self {
-            batch_size: 5000,      // Increased for higher throughput
+            batch_size: 5000,        // Increased for higher throughput
             flush_interval_secs: 15, // Reduced for lower latency
-            scan_interval_secs: 30, // More frequent scanning
+            scan_interval_secs: 30,  // More frequent scanning
             max_concurrent_apps: 50, // Increased parallelism
-            num_batch_writers: 8,   // Multiple writers
+            num_batch_writers: 8,    // Multiple writers
         }
     }
 }

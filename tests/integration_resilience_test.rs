@@ -1,6 +1,5 @@
 /// Integration tests for resilience and fault tolerance
 /// Tests the complete system under various failure conditions
-
 use anyhow::Result;
 use spark_history_server::storage::duckdb_store::DuckDbStore;
 use std::sync::Arc;
@@ -17,7 +16,7 @@ async fn test_database_worker_failure_recovery() -> Result<()> {
 
     let temp_dir = tempdir()?;
     let db_path = temp_dir.path().join("worker_failure_test.db");
-    
+
     // Initialize store with worker architecture
     let store = Arc::new(DuckDbStore::new(&db_path).await?);
 
@@ -52,24 +51,30 @@ async fn test_database_worker_failure_recovery() -> Result<()> {
     let success_rate = (successful_batches as f64 / total_batches as f64) * 100.0;
 
     println!("✅ Worker resilience test completed:");
-    println!("   📊 Success rate: {:.1}% ({}/{} batches)", success_rate, successful_batches, total_batches);
+    println!(
+        "   📊 Success rate: {:.1}% ({}/{} batches)",
+        success_rate, successful_batches, total_batches
+    );
     println!("   ⏱️  Total time: {:?}", start_time.elapsed());
 
     // Should achieve high success rate even with worker stress
-    assert!(success_rate > 80.0, "Should maintain >80% success rate under worker stress");
+    assert!(
+        success_rate > 80.0,
+        "Should maintain >80% success rate under worker stress"
+    );
 
     Ok(())
 }
 
 /// Test circuit breaker functionality under high error rates
-#[tokio::test] 
+#[tokio::test]
 #[traced_test]
 async fn test_circuit_breaker_protection() -> Result<()> {
     println!("🔌 Testing circuit breaker protection...");
 
     let temp_dir = tempdir()?;
     let db_path = temp_dir.path().join("circuit_breaker_test.db");
-    
+
     let store = Arc::new(DuckDbStore::new(&db_path).await?);
 
     // Create intentionally problematic events (very large payloads)
@@ -90,7 +95,12 @@ async fn test_circuit_breaker_protection() -> Result<()> {
 
     // Stress the system to trigger circuit breaker
     for (i, event) in large_events.iter().enumerate() {
-        match timeout(Duration::from_secs(5), store.insert_events_batch(vec![event.clone()])).await {
+        match timeout(
+            Duration::from_secs(5),
+            store.insert_events_batch(vec![event.clone()]),
+        )
+        .await
+        {
             Ok(Ok(())) => {
                 successful_operations += 1;
             }
@@ -111,8 +121,14 @@ async fn test_circuit_breaker_protection() -> Result<()> {
     }
 
     println!("✅ Circuit breaker test results:");
-    println!("   🔌 Circuit breaker triggered: {}", circuit_breaker_triggered);
-    println!("   ✅ Successful operations before protection: {}", successful_operations);
+    println!(
+        "   🔌 Circuit breaker triggered: {}",
+        circuit_breaker_triggered
+    );
+    println!(
+        "   ✅ Successful operations before protection: {}",
+        successful_operations
+    );
 
     // Circuit breaker should activate to protect system
     // (This might not trigger in all test environments, so we don't assert it)
@@ -147,17 +163,20 @@ async fn test_comprehensive_failure_recovery() -> Result<()> {
     println!("Scenario 2: High-load batch processing");
     let concurrent_batches = 10;
     let events_per_batch = 100;
-    
+
     let mut handles = Vec::new();
 
     for batch_id in 0..concurrent_batches {
         let store_clone = Arc::clone(&store);
-        
+
         let handle = tokio::spawn(async move {
             let mut batch_events = Vec::new();
             for event_id in 0..events_per_batch {
                 let global_id = batch_id * events_per_batch + event_id;
-                batch_events.push(create_test_event(global_id as i64, &format!("recovery_app_{}", batch_id)));
+                batch_events.push(create_test_event(
+                    global_id as i64,
+                    &format!("recovery_app_{}", batch_id),
+                ));
             }
 
             let start_time = std::time::Instant::now();
@@ -166,9 +185,7 @@ async fn test_comprehensive_failure_recovery() -> Result<()> {
                     let duration = start_time.elapsed();
                     Ok((batch_id, events_per_batch, duration))
                 }
-                Err(e) => {
-                    Err(anyhow::anyhow!("Batch {} failed: {}", batch_id, e))
-                }
+                Err(e) => Err(anyhow::anyhow!("Batch {} failed: {}", batch_id, e)),
             }
         });
 
@@ -186,7 +203,10 @@ async fn test_comprehensive_failure_recovery() -> Result<()> {
                 successful_batches += 1;
                 total_events_processed += events;
                 max_duration = max_duration.max(duration);
-                println!("✅ Batch {} processed {} events in {:?}", batch_id, events, duration);
+                println!(
+                    "✅ Batch {} processed {} events in {:?}",
+                    batch_id, events, duration
+                );
             }
             Err(e) => {
                 println!("❌ Batch processing error: {}", e);
@@ -195,7 +215,10 @@ async fn test_comprehensive_failure_recovery() -> Result<()> {
     }
 
     println!("✅ High-load processing results:");
-    println!("   📊 Successful batches: {}/{}", successful_batches, concurrent_batches);
+    println!(
+        "   📊 Successful batches: {}/{}",
+        successful_batches, concurrent_batches
+    );
     println!("   📈 Total events processed: {}", total_events_processed);
     println!("   ⏱️  Maximum batch duration: {:?}", max_duration);
 
@@ -206,14 +229,17 @@ async fn test_comprehensive_failure_recovery() -> Result<()> {
 
     // Verify system maintained data integrity
     assert!(final_count > 0, "Database should contain processed events");
-    assert!(successful_batches >= concurrent_batches / 2, "Majority of batches should succeed");
+    assert!(
+        successful_batches >= concurrent_batches / 2,
+        "Majority of batches should succeed"
+    );
 
     Ok(())
 }
 
 /// Test graceful degradation under resource constraints
 #[tokio::test]
-#[traced_test] 
+#[traced_test]
 async fn test_resource_constraint_handling() -> Result<()> {
     println!("📈 Testing resource constraint handling...");
 
@@ -232,8 +258,10 @@ async fn test_resource_constraint_handling() -> Result<()> {
     for batch_id in 0..NUM_RAPID_BATCHES {
         let mut events = Vec::new();
         for event_id in 0..EVENTS_PER_BATCH {
-            events.push(create_test_event((batch_id * EVENTS_PER_BATCH + event_id) as i64, 
-                                        &format!("resource_test_app_{}", batch_id % 20)));
+            events.push(create_test_event(
+                (batch_id * EVENTS_PER_BATCH + event_id) as i64,
+                &format!("resource_test_app_{}", batch_id % 20),
+            ));
         }
 
         // Process with minimal delay to create resource pressure
@@ -243,7 +271,10 @@ async fn test_resource_constraint_handling() -> Result<()> {
                 total_events += EVENTS_PER_BATCH;
             }
             Ok(Err(e)) => {
-                println!("⚠️  Batch {} failed under resource pressure: {}", batch_id, e);
+                println!(
+                    "⚠️  Batch {} failed under resource pressure: {}",
+                    batch_id, e
+                );
             }
             Err(_) => {
                 println!("⏰ Batch {} timed out under resource pressure", batch_id);
@@ -256,8 +287,10 @@ async fn test_resource_constraint_handling() -> Result<()> {
         if batch_id % 25 == 0 {
             let elapsed = start_time.elapsed();
             let throughput = total_events as f64 / elapsed.as_secs_f64();
-            println!("Progress: {}/{} batches, {:.0} events/sec throughput", 
-                     batch_id, NUM_RAPID_BATCHES, throughput);
+            println!(
+                "Progress: {}/{} batches, {:.0} events/sec throughput",
+                batch_id, NUM_RAPID_BATCHES, throughput
+            );
         }
     }
 
@@ -266,13 +299,22 @@ async fn test_resource_constraint_handling() -> Result<()> {
     let success_rate = (processed_batches as f64 / NUM_RAPID_BATCHES as f64) * 100.0;
 
     println!("✅ Resource constraint test results:");
-    println!("   📊 Success rate: {:.1}% ({}/{} batches)", success_rate, processed_batches, NUM_RAPID_BATCHES);
+    println!(
+        "   📊 Success rate: {:.1}% ({}/{} batches)",
+        success_rate, processed_batches, NUM_RAPID_BATCHES
+    );
     println!("   📈 Final throughput: {:.0} events/sec", final_throughput);
     println!("   ⏱️  Total duration: {:?}", total_duration);
 
     // System should maintain reasonable performance under pressure
-    assert!(success_rate > 70.0, "Should maintain >70% success rate under resource pressure");
-    assert!(final_throughput > 1000.0, "Should maintain >1000 events/sec even under pressure");
+    assert!(
+        success_rate > 70.0,
+        "Should maintain >70% success rate under resource pressure"
+    );
+    assert!(
+        final_throughput > 1000.0,
+        "Should maintain >1000 events/sec even under pressure"
+    );
 
     Ok(())
 }
@@ -295,11 +337,18 @@ async fn test_data_consistency_across_failures() -> Result<()> {
     for app_id in 0..APPS_COUNT {
         for event_id in 0..EVENTS_PER_APP {
             let global_id = (app_id * EVENTS_PER_APP + event_id) as i64;
-            expected_events.push(create_test_event(global_id, &format!("consistency_app_{}", app_id)));
+            expected_events.push(create_test_event(
+                global_id,
+                &format!("consistency_app_{}", app_id),
+            ));
         }
     }
 
-    println!("Phase 1: Writing {} events across {} applications", expected_events.len(), APPS_COUNT);
+    println!(
+        "Phase 1: Writing {} events across {} applications",
+        expected_events.len(),
+        APPS_COUNT
+    );
 
     // Write events in batches with some intentional failures
     let batch_size = 25;
@@ -326,7 +375,7 @@ async fn test_data_consistency_across_failures() -> Result<()> {
 
     println!("Phase 2: Verifying data consistency");
     let final_count = store.count_events().await?;
-    
+
     println!("✅ Data consistency results:");
     println!("   📊 Expected events: {}", expected_events.len());
     println!("   ✍️  Written events: {}", written_events);
@@ -336,15 +385,21 @@ async fn test_data_consistency_across_failures() -> Result<()> {
     let consistency_ratio = final_count as f64 / expected_events.len() as f64;
     println!("   📈 Consistency ratio: {:.1}%", consistency_ratio * 100.0);
 
-    assert!(consistency_ratio > 0.95, "Should maintain >95% data consistency");
+    assert!(
+        consistency_ratio > 0.95,
+        "Should maintain >95% data consistency"
+    );
 
     Ok(())
 }
 
 /// Helper function to create test events
-fn create_test_event(id: i64, app_id: &str) -> spark_history_server::storage::duckdb_store::SparkEvent {
-    use spark_history_server::storage::duckdb_store::SparkEvent;
+fn create_test_event(
+    id: i64,
+    app_id: &str,
+) -> spark_history_server::storage::duckdb_store::SparkEvent {
     use serde_json::json;
+    use spark_history_server::storage::duckdb_store::SparkEvent;
 
     let raw_data = json!({
         "Event": "SparkListenerTaskEnd",
@@ -384,13 +439,28 @@ async fn run_comprehensive_resilience_tests() -> Result<()> {
     println!("🧪 Running comprehensive resilience test suite...\n");
 
     let mut test_results = Vec::new();
-    
+
     // Run each test individually and collect results
-    test_results.push(("Database Worker Failure Recovery", test_database_worker_failure_recovery().await));
-    test_results.push(("Circuit Breaker Protection", test_circuit_breaker_protection().await));
-    test_results.push(("Comprehensive Failure Recovery", test_comprehensive_failure_recovery().await));
-    test_results.push(("Resource Constraint Handling", test_resource_constraint_handling().await));
-    test_results.push(("Data Consistency Across Failures", test_data_consistency_across_failures().await));
+    test_results.push((
+        "Database Worker Failure Recovery",
+        test_database_worker_failure_recovery().await,
+    ));
+    test_results.push((
+        "Circuit Breaker Protection",
+        test_circuit_breaker_protection().await,
+    ));
+    test_results.push((
+        "Comprehensive Failure Recovery",
+        test_comprehensive_failure_recovery().await,
+    ));
+    test_results.push((
+        "Resource Constraint Handling",
+        test_resource_constraint_handling().await,
+    ));
+    test_results.push((
+        "Data Consistency Across Failures",
+        test_data_consistency_across_failures().await,
+    ));
 
     let mut passed = 0;
     let mut failed = 0;
@@ -427,6 +497,9 @@ async fn run_comprehensive_resilience_tests() -> Result<()> {
         println!("🔧 These must be resolved before production deployment");
     }
 
-    assert_eq!(failed, 0, "All resilience tests must pass for production readiness");
+    assert_eq!(
+        failed, 0,
+        "All resilience tests must pass for production readiness"
+    );
     Ok(())
 }

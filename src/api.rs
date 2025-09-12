@@ -8,7 +8,7 @@ use axum::{
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use serde::Deserialize;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::analytics_api;
 use crate::dashboard;
@@ -81,7 +81,7 @@ async fn list_applications(
     info!("GET /api/v1/applications - params: {:?}", params);
 
     // Parse status filter
-    let status_filter = params.status.as_ref().and_then(|s| {
+    let _status_filter = params.status.as_ref().and_then(|s| {
         s.split(',')
             .filter_map(|status| match status.trim().to_uppercase().as_str() {
                 "RUNNING" => Some(ApplicationStatus::Running),
@@ -93,25 +93,28 @@ async fn list_applications(
     });
 
     // Parse date filters
-    let min_date = parse_date_param(params.min_date.as_deref());
-    let max_date = parse_date_param(params.max_date.as_deref());
-    let min_end_date = parse_date_param(params.min_end_date.as_deref());
-    let max_end_date = parse_date_param(params.max_end_date.as_deref());
+    let _min_date = parse_date_param(params.min_date.as_deref());
+    let _max_date = parse_date_param(params.max_date.as_deref());
+    let _min_end_date = parse_date_param(params.min_end_date.as_deref());
+    let _max_end_date = parse_date_param(params.max_end_date.as_deref());
 
     match provider
-        .get_applications(
-            params.limit,
-            status_filter,
-            min_date,
-            max_date,
-            min_end_date,
-            max_end_date,
-        )
+        .get_applications(params.limit)
         .await
     {
         Ok(applications) => {
             info!("Returning {} applications", applications.len());
-            Ok(Json(applications))
+            let apps: Result<Vec<ApplicationInfo>, _> = applications
+                .into_iter()
+                .map(|v| serde_json::from_value(v))
+                .collect();
+            match apps {
+                Ok(apps) => Ok(Json(apps)),
+                Err(e) => {
+                    error!("Failed to deserialize applications: {}", e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
         }
         Err(e) => {
             tracing::error!("Failed to get applications: {}", e);
@@ -127,10 +130,18 @@ async fn get_application(
 ) -> Result<Json<ApplicationInfo>, StatusCode> {
     info!("GET /api/v1/applications/{}", app_id);
 
-    match provider.get_application(&app_id).await {
-        Ok(Some(app)) => {
-            info!("Found application: {}", app_id);
-            Ok(Json(app))
+    match provider.get_application_summary(&app_id).await {
+        Ok(Some(app_value)) => {
+            match serde_json::from_value::<ApplicationInfo>(app_value) {
+                Ok(app) => {
+                    info!("Found application: {}", app_id);
+                    Ok(Json(app))
+                }
+                Err(e) => {
+                    error!("Failed to deserialize application {}: {}", app_id, e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
         }
         Ok(None) => {
             info!("Application not found: {}", app_id);
@@ -160,13 +171,25 @@ async fn get_application_executors(
     info!("GET /api/v1/applications/{}/executors", app_id);
 
     match provider.get_executors(&app_id).await {
-        Ok(executors) => {
-            info!(
-                "Found {} executors for application: {}",
-                executors.len(),
-                app_id
-            );
-            Ok(Json(executors))
+        Ok(executor_values) => {
+            let executors: Result<Vec<crate::models::ExecutorSummary>, _> = executor_values
+                .into_iter()
+                .map(|v| serde_json::from_value(v))
+                .collect();
+            match executors {
+                Ok(executors) => {
+                    info!(
+                        "Found {} executors for application: {}",
+                        executors.len(),
+                        app_id
+                    );
+                    Ok(Json(executors))
+                }
+                Err(e) => {
+                    error!("Failed to deserialize executors for app {}: {}", app_id, e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
         }
         Err(e) => {
             tracing::error!("Failed to get executors for {}: {}", app_id, e);

@@ -15,7 +15,6 @@ mod storage;
 
 use crate::api::create_app;
 use crate::config::{HdfsConfig, KerberosConfig, S3Config, Settings};
-use crate::storage::HistoryProvider;
 
 #[derive(Parser, Debug)]
 #[command(name = "spark-history-server")]
@@ -232,8 +231,14 @@ async fn main() -> Result<()> {
         info!("Storage backend: Local filesystem");
     }
 
-    // Initialize history provider
-    let history_provider = HistoryProvider::new(settings.history.clone()).await?;
+    // Initialize history provider using the factory
+    use crate::storage::{StorageBackendFactory, StorageConfig};
+    let storage_config = StorageConfig::DuckDB {
+        database_path: settings.history.database_directory.clone().unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
 
     // Create the web application
     let app = create_app(history_provider).await?;

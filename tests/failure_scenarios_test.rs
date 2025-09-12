@@ -1,8 +1,7 @@
 /// Comprehensive failure scenario tests for production resilience
 /// Tests all critical failure modes and recovery mechanisms
-
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tempfile::tempdir;
@@ -11,8 +10,8 @@ use tracing_test::traced_test;
 // Mock structures for testing (would be replaced with actual implementations)
 mod test_mocks {
     use super::*;
-    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use tokio::sync::RwLock;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,7 +77,7 @@ mod test_mocks {
             if cache_file.exists() {
                 let data = tokio::fs::read_to_string(cache_file).await?;
                 let recovered: HashMap<String, MockCachedFileInfo> = serde_json::from_str(&data)?;
-                
+
                 let mut cache = self.memory_cache.write().await;
                 *cache = recovered;
             }
@@ -196,23 +195,33 @@ async fn test_process_restart_cache_recovery() -> Result<()> {
     // Simulate first process instance
     {
         let cache = MockPersistentCache::new(cache_dir.clone()).await;
-        
-        // Add some data to cache
-        cache.put_file("file1".to_string(), MockCachedFileInfo {
-            path: "file1".to_string(),
-            size: 1024,
-            modification_time: 123456,
-            is_complete: true,
-            last_scanned: 123456,
-        }).await?;
 
-        cache.put_file("file2".to_string(), MockCachedFileInfo {
-            path: "file2".to_string(),
-            size: 2048,
-            modification_time: 123457,
-            is_complete: false,
-            last_scanned: 123457,
-        }).await?;
+        // Add some data to cache
+        cache
+            .put_file(
+                "file1".to_string(),
+                MockCachedFileInfo {
+                    path: "file1".to_string(),
+                    size: 1024,
+                    modification_time: 123456,
+                    is_complete: true,
+                    last_scanned: 123456,
+                },
+            )
+            .await?;
+
+        cache
+            .put_file(
+                "file2".to_string(),
+                MockCachedFileInfo {
+                    path: "file2".to_string(),
+                    size: 2048,
+                    modification_time: 123457,
+                    is_complete: false,
+                    last_scanned: 123457,
+                },
+            )
+            .await?;
 
         // Persist to disk
         cache.persist_to_disk().await?;
@@ -223,7 +232,11 @@ async fn test_process_restart_cache_recovery() -> Result<()> {
     // Simulate process restart (second instance)
     {
         let cache = MockPersistentCache::new(cache_dir.clone()).await;
-        assert_eq!(cache.get_cache_size().await, 0, "New process should start with empty memory cache");
+        assert_eq!(
+            cache.get_cache_size().await,
+            0,
+            "New process should start with empty memory cache"
+        );
 
         // Recover from disk
         let start_time = std::time::Instant::now();
@@ -233,13 +246,20 @@ async fn test_process_restart_cache_recovery() -> Result<()> {
         // Verify recovery
         assert_eq!(cache.get_cache_size().await, 2);
         assert_eq!(cache.get_recovery_count(), 1);
-        
+
         let recovered_file1 = cache.get_file("file1").await;
         assert!(recovered_file1.is_some());
         assert_eq!(recovered_file1.unwrap().size, 1024);
 
-        println!("✅ Process restart recovery: {} files in {:?}", cache.get_cache_size().await, recovery_time);
-        assert!(recovery_time < Duration::from_secs(5), "Recovery should be fast");
+        println!(
+            "✅ Process restart recovery: {} files in {:?}",
+            cache.get_cache_size().await,
+            recovery_time
+        );
+        assert!(
+            recovery_time < Duration::from_secs(5),
+            "Recovery should be fast"
+        );
     }
 
     Ok(())
@@ -253,15 +273,20 @@ async fn test_cache_corruption_recovery() -> Result<()> {
     let cache_dir = temp_dir.path().to_path_buf();
 
     let cache = MockPersistentCache::new(cache_dir.clone()).await;
-    
+
     // Add data and persist
-    cache.put_file("file1".to_string(), MockCachedFileInfo {
-        path: "file1".to_string(),
-        size: 1024,
-        modification_time: 123456,
-        is_complete: true,
-        last_scanned: 123456,
-    }).await?;
+    cache
+        .put_file(
+            "file1".to_string(),
+            MockCachedFileInfo {
+                path: "file1".to_string(),
+                size: 1024,
+                modification_time: 123456,
+                is_complete: true,
+                last_scanned: 123456,
+            },
+        )
+        .await?;
 
     cache.persist_to_disk().await?;
     assert_eq!(cache.get_cache_size().await, 1);
@@ -271,11 +296,18 @@ async fn test_cache_corruption_recovery() -> Result<()> {
 
     // Attempt recovery - should fail and trigger rebuild
     let recovery_result = cache.recover_from_disk().await;
-    assert!(recovery_result.is_err(), "Recovery should fail with corruption");
+    assert!(
+        recovery_result.is_err(),
+        "Recovery should fail with corruption"
+    );
 
     // Verify system can handle corruption gracefully
     println!("✅ Corruption detected and handled gracefully");
-    assert_eq!(cache.get_recovery_count(), 1, "Recovery should have been attempted");
+    assert_eq!(
+        cache.get_recovery_count(),
+        1,
+        "Recovery should have been attempted"
+    );
 
     Ok(())
 }
@@ -299,19 +331,27 @@ async fn test_hdfs_network_failure_fallback() -> Result<()> {
         let files = hdfs_reader.list_event_files(app).await?;
         for file in files {
             let file_info = hdfs_reader.get_file_info(&file).await?;
-            cache.put_file(file.clone(), MockCachedFileInfo {
-                path: file,
-                size: file_info.size,
-                modification_time: file_info.modification_time,
-                is_complete: true,
-                last_scanned: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-            }).await?;
+            cache
+                .put_file(
+                    file.clone(),
+                    MockCachedFileInfo {
+                        path: file,
+                        size: file_info.size,
+                        modification_time: file_info.modification_time,
+                        is_complete: true,
+                        last_scanned: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                    },
+                )
+                .await?;
         }
     }
 
     let initial_operations = hdfs_reader.get_operation_count();
     let cached_files = cache.get_cache_size().await;
-    println!("✅ Normal operation: {} HDFS operations, {} cached files", initial_operations, cached_files);
+    println!(
+        "✅ Normal operation: {} HDFS operations, {} cached files",
+        initial_operations, cached_files
+    );
 
     // Step 2: Simulate network failure
     hdfs_reader.set_availability(false);
@@ -322,7 +362,10 @@ async fn test_hdfs_network_failure_fallback() -> Result<()> {
 
     // Step 3: Fallback to cache should work
     let cached_file = cache.get_file("/events/app_1/part-001").await;
-    assert!(cached_file.is_some(), "Should be able to read from cache during HDFS failure");
+    assert!(
+        cached_file.is_some(),
+        "Should be able to read from cache during HDFS failure"
+    );
     println!("✅ Fallback to cache: Successfully served cached data during HDFS outage");
 
     // Step 4: Recovery when network is restored
@@ -348,26 +391,40 @@ async fn test_memory_pressure_cache_eviction() -> Result<()> {
     // Fill cache beyond capacity
     for i in 0..MAX_CACHE_SIZE * 2 {
         let file_name = format!("large_file_{}", i);
-        cache.put_file(file_name.clone(), MockCachedFileInfo {
-            path: file_name,
-            size: 1024 * 1024, // 1MB each
-            modification_time: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-            is_complete: true,
-            last_scanned: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-        }).await?;
+        cache
+            .put_file(
+                file_name.clone(),
+                MockCachedFileInfo {
+                    path: file_name,
+                    size: 1024 * 1024, // 1MB each
+                    modification_time: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                    is_complete: true,
+                    last_scanned: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                },
+            )
+            .await?;
         file_count += 1;
 
         // Simulate memory pressure handling
         if cache.get_cache_size().await > MAX_CACHE_SIZE {
             // In real implementation, this would trigger LRU eviction
-            println!("⚠️  Cache size exceeded limit: {}", cache.get_cache_size().await);
+            println!(
+                "⚠️  Cache size exceeded limit: {}",
+                cache.get_cache_size().await
+            );
             break;
         }
     }
 
-    println!("✅ Memory pressure test: Added {} files, cache size managed", file_count);
+    println!(
+        "✅ Memory pressure test: Added {} files, cache size managed",
+        file_count
+    );
     // In a real implementation, we'd verify LRU eviction occurred
-    assert!(file_count > MAX_CACHE_SIZE, "Should have attempted to add more files than limit");
+    assert!(
+        file_count > MAX_CACHE_SIZE,
+        "Should have attempted to add more files than limit"
+    );
 
     Ok(())
 }
@@ -388,20 +445,34 @@ async fn test_concurrent_access_safety() -> Result<()> {
     // Spawn concurrent writers
     for writer_id in 0..NUM_CONCURRENT_WRITERS {
         let cache_clone = Arc::clone(&cache);
-        
+
         let handle = tokio::spawn(async move {
             for file_id in 0..FILES_PER_WRITER {
                 let file_name = format!("writer_{}_file_{}", writer_id, file_id);
-                let result = cache_clone.put_file(file_name.clone(), MockCachedFileInfo {
-                    path: file_name,
-                    size: (writer_id * 1000 + file_id) as u64,
-                    modification_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                    is_complete: true,
-                    last_scanned: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                }).await;
+                let result = cache_clone
+                    .put_file(
+                        file_name.clone(),
+                        MockCachedFileInfo {
+                            path: file_name,
+                            size: (writer_id * 1000 + file_id) as u64,
+                            modification_time: SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                            is_complete: true,
+                            last_scanned: SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                        },
+                    )
+                    .await;
 
                 if result.is_err() {
-                    eprintln!("Writer {} failed on file {}: {:?}", writer_id, file_id, result);
+                    eprintln!(
+                        "Writer {} failed on file {}: {:?}",
+                        writer_id, file_id, result
+                    );
                     return Err(result.unwrap_err());
                 }
 
@@ -426,11 +497,23 @@ async fn test_concurrent_access_safety() -> Result<()> {
     let final_cache_size = cache.get_cache_size().await;
     let expected_files = NUM_CONCURRENT_WRITERS * FILES_PER_WRITER;
 
-    println!("✅ Concurrent access test: {}/{} writers successful", successful_writers, NUM_CONCURRENT_WRITERS);
-    println!("✅ Final cache size: {} files (expected: {})", final_cache_size, expected_files);
+    println!(
+        "✅ Concurrent access test: {}/{} writers successful",
+        successful_writers, NUM_CONCURRENT_WRITERS
+    );
+    println!(
+        "✅ Final cache size: {} files (expected: {})",
+        final_cache_size, expected_files
+    );
 
-    assert_eq!(successful_writers, NUM_CONCURRENT_WRITERS, "All writers should succeed");
-    assert_eq!(final_cache_size, expected_files, "All files should be in cache");
+    assert_eq!(
+        successful_writers, NUM_CONCURRENT_WRITERS,
+        "All writers should succeed"
+    );
+    assert_eq!(
+        final_cache_size, expected_files,
+        "All files should be in cache"
+    );
 
     Ok(())
 }
@@ -455,7 +538,7 @@ async fn test_high_failure_rate_resilience() -> Result<()> {
                 _failed_operations += 1;
                 // Simulate retry logic
                 tokio::time::sleep(Duration::from_millis(10)).await;
-                
+
                 // Retry once
                 if hdfs_reader.list_applications().await.is_ok() {
                     successful_operations += 1;
@@ -466,18 +549,26 @@ async fn test_high_failure_rate_resilience() -> Result<()> {
         }
 
         if i % 20 == 0 {
-            println!("Progress: {}/{} operations, {:.1}% success rate", 
-                     i, NUM_OPERATIONS, 
-                     (successful_operations as f64 / (i + 1) as f64) * 100.0);
+            println!(
+                "Progress: {}/{} operations, {:.1}% success rate",
+                i,
+                NUM_OPERATIONS,
+                (successful_operations as f64 / (i + 1) as f64) * 100.0
+            );
         }
     }
 
     let success_rate = (successful_operations as f64 / NUM_OPERATIONS as f64) * 100.0;
-    println!("✅ High failure rate test: {:.1}% final success rate ({}/{} successful)", 
-             success_rate, successful_operations, NUM_OPERATIONS);
+    println!(
+        "✅ High failure rate test: {:.1}% final success rate ({}/{} successful)",
+        success_rate, successful_operations, NUM_OPERATIONS
+    );
 
     // With 50% base failure rate + 1 retry, we should get >75% success rate
-    assert!(success_rate > 75.0, "Should achieve >75% success rate with retries");
+    assert!(
+        success_rate > 75.0,
+        "Should achieve >75% success rate with retries"
+    );
 
     Ok(())
 }
@@ -494,46 +585,57 @@ async fn test_end_to_end_production_scenario() -> Result<()> {
     // Phase 1: Normal operation
     println!("Phase 1: Normal operation");
     let start_time = std::time::Instant::now();
-    
+
     let apps = hdfs_reader.list_applications().await?;
     for app in &apps {
         let files = hdfs_reader.list_event_files(app).await?;
         for file in files {
             let file_info = hdfs_reader.get_file_info(&file).await?;
-            cache.put_file(file.clone(), MockCachedFileInfo {
-                path: file,
-                size: file_info.size,
-                modification_time: file_info.modification_time,
-                is_complete: true,
-                last_scanned: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-            }).await?;
+            cache
+                .put_file(
+                    file.clone(),
+                    MockCachedFileInfo {
+                        path: file,
+                        size: file_info.size,
+                        modification_time: file_info.modification_time,
+                        is_complete: true,
+                        last_scanned: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                    },
+                )
+                .await?;
         }
     }
-    
+
     let phase1_time = start_time.elapsed();
     let cache_size_after_phase1 = cache.get_cache_size().await;
-    println!("✅ Phase 1 completed: {} files cached in {:?}", cache_size_after_phase1, phase1_time);
+    println!(
+        "✅ Phase 1 completed: {} files cached in {:?}",
+        cache_size_after_phase1, phase1_time
+    );
 
     // Phase 2: Persist and simulate restart
     println!("Phase 2: Process restart simulation");
     cache.persist_to_disk().await?;
-    
+
     // Clear memory cache to simulate restart
     let cache2 = MockPersistentCache::new(cache_dir.clone()).await;
     let restart_recovery_start = std::time::Instant::now();
     cache2.recover_from_disk().await?;
     let restart_recovery_time = restart_recovery_start.elapsed();
-    
+
     assert_eq!(cache2.get_cache_size().await, cache_size_after_phase1);
-    println!("✅ Phase 2 completed: Restart recovery in {:?}", restart_recovery_time);
+    println!(
+        "✅ Phase 2 completed: Restart recovery in {:?}",
+        restart_recovery_time
+    );
 
     // Phase 3: Handle network failure
     println!("Phase 3: Network failure handling");
     hdfs_reader.set_availability(false);
-    
+
     // Should fail to get new data
     assert!(hdfs_reader.list_applications().await.is_err());
-    
+
     // But should serve from cache
     let cached_file = cache2.get_file("/events/app_1/part-001").await;
     assert!(cached_file.is_some());
@@ -542,7 +644,7 @@ async fn test_end_to_end_production_scenario() -> Result<()> {
     // Phase 4: Recovery and continued operation
     println!("Phase 4: Recovery and continued operation");
     hdfs_reader.set_availability(true);
-    
+
     let recovery_apps = hdfs_reader.list_applications().await?;
     assert_eq!(recovery_apps.len(), apps.len());
     println!("✅ Phase 4 completed: Full recovery achieved");
@@ -556,8 +658,14 @@ async fn test_end_to_end_production_scenario() -> Result<()> {
     println!("   🔋 System recovery: ✅");
 
     // Performance assertions
-    assert!(restart_recovery_time < Duration::from_secs(10), "Restart recovery should be under 10 seconds");
-    assert!(phase1_time < Duration::from_secs(30), "Normal operation should be fast");
+    assert!(
+        restart_recovery_time < Duration::from_secs(10),
+        "Restart recovery should be under 10 seconds"
+    );
+    assert!(
+        phase1_time < Duration::from_secs(30),
+        "Normal operation should be fast"
+    );
 
     Ok(())
 }
@@ -569,15 +677,36 @@ async fn run_all_failure_scenario_tests() -> Result<()> {
     println!("🧪 Running comprehensive failure scenario test suite...\n");
 
     let mut test_results = Vec::new();
-    
+
     // Run each test individually and collect results
-    test_results.push(("Process Restart Recovery", test_process_restart_cache_recovery().await));
-    test_results.push(("Cache Corruption Recovery", test_cache_corruption_recovery().await));
-    test_results.push(("HDFS Network Failure", test_hdfs_network_failure_fallback().await));
-    test_results.push(("Memory Pressure Management", test_memory_pressure_cache_eviction().await));
-    test_results.push(("Concurrent Access Safety", test_concurrent_access_safety().await));
-    test_results.push(("High Failure Rate Resilience", test_high_failure_rate_resilience().await));
-    test_results.push(("End-to-End Production", test_end_to_end_production_scenario().await));
+    test_results.push((
+        "Process Restart Recovery",
+        test_process_restart_cache_recovery().await,
+    ));
+    test_results.push((
+        "Cache Corruption Recovery",
+        test_cache_corruption_recovery().await,
+    ));
+    test_results.push((
+        "HDFS Network Failure",
+        test_hdfs_network_failure_fallback().await,
+    ));
+    test_results.push((
+        "Memory Pressure Management",
+        test_memory_pressure_cache_eviction().await,
+    ));
+    test_results.push((
+        "Concurrent Access Safety",
+        test_concurrent_access_safety().await,
+    ));
+    test_results.push((
+        "High Failure Rate Resilience",
+        test_high_failure_rate_resilience().await,
+    ));
+    test_results.push((
+        "End-to-End Production",
+        test_end_to_end_production_scenario().await,
+    ));
 
     let mut passed = 0;
     let mut failed = 0;
@@ -599,12 +728,19 @@ async fn run_all_failure_scenario_tests() -> Result<()> {
     }
 
     println!("={}", "=".repeat(50));
-    println!("🎯 FINAL RESULTS: {}/{} tests passed", passed, passed + failed);
+    println!(
+        "🎯 FINAL RESULTS: {}/{} tests passed",
+        passed,
+        passed + failed
+    );
 
     if failed == 0 {
         println!("🎉 ALL FAILURE SCENARIOS COVERED - System is production ready!");
     } else {
-        println!("⚠️  {} critical issues need attention before production", failed);
+        println!(
+            "⚠️  {} critical issues need attention before production",
+            failed
+        );
     }
 
     assert_eq!(failed, 0, "All failure scenario tests must pass");

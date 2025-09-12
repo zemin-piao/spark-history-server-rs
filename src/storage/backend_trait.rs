@@ -1,6 +1,5 @@
 /// Storage backend trait for analytical data processing
 /// Provides a unified interface for different storage systems
-
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -8,8 +7,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::analytics_api::{
-    AnalyticsQuery, CrossAppSummary, PerformanceTrend, ResourceUsageSummary, 
-    TaskDistribution, EfficiencyAnalysis, ResourceHog, CostOptimization
+    AnalyticsQuery, CostOptimization, CrossAppSummary, EfficiencyAnalysis, PerformanceTrend,
+    ResourceHog, ResourceUsageSummary, TaskDistribution,
 };
 
 /// Storage backend types supported by the system
@@ -39,6 +38,8 @@ pub trait AnalyticalStorageBackend {
     async fn insert_events_batch(&self, events: Vec<crate::storage::SparkEvent>) -> Result<()>;
     async fn get_applications(&self, limit: Option<usize>) -> Result<Vec<Value>>;
     async fn get_application_summary(&self, app_id: &str) -> Result<Option<Value>>;
+    async fn get_executors(&self, app_id: &str) -> Result<Vec<Value>>;
+    async fn get_active_applications(&self, limit: Option<usize>) -> Result<Vec<Value>>;
 
     /// Health and status operations
     async fn health_check(&self) -> Result<bool>;
@@ -46,10 +47,11 @@ pub trait AnalyticalStorageBackend {
 
     /// Advanced analytics operations
     async fn get_cross_app_summary(&self, query: &AnalyticsQuery) -> Result<CrossAppSummary>;
-    async fn get_performance_trends(&self, query: &AnalyticsQuery) -> Result<Vec<PerformanceTrend>>;
+    async fn get_performance_trends(&self, query: &AnalyticsQuery)
+        -> Result<Vec<PerformanceTrend>>;
     async fn get_resource_usage(&self, query: &AnalyticsQuery) -> Result<ResourceUsageSummary>;
     async fn get_task_distribution(&self, query: &AnalyticsQuery) -> Result<TaskDistribution>;
-    async fn get_efficiency_analysis(&self, query: &AnalyticsQuery) -> Result<EfficiencyAnalysis>;
+    async fn get_efficiency_analysis(&self, query: &AnalyticsQuery) -> Result<Vec<EfficiencyAnalysis>>;
     async fn get_resource_hogs(&self, query: &AnalyticsQuery) -> Result<Vec<ResourceHog>>;
     async fn get_cost_optimization(&self, query: &AnalyticsQuery) -> Result<CostOptimization>;
 
@@ -59,7 +61,7 @@ pub trait AnalyticalStorageBackend {
     async fn get_storage_size(&self) -> Result<u64>;
 
     /// Optional: Backend-specific operations
-    async fn execute_custom_query(&self, query: &str) -> Result<Vec<Value>> {
+    async fn execute_custom_query(&self, _query: &str) -> Result<Vec<Value>> {
         // Default implementation returns empty result
         Ok(vec![])
     }

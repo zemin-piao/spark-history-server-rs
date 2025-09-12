@@ -6,12 +6,12 @@ use serde_json::Value;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 use crate::analytics_api::{
-    AnalyticsQuery, CapacityTrend, CostOptimization, CrossAppSummary, DifficultyLevel, 
-    EfficiencyAnalysis, EfficiencyCategory, OptimizationType, PerformanceTrend, 
-    ResourceHog, ResourceType, ResourceUsageSummary, RiskLevel, TaskDistribution,
+    AnalyticsQuery, CostOptimization, CrossAppSummary, DifficultyLevel, EfficiencyAnalysis,
+    EfficiencyCategory, OptimizationType, PerformanceTrend, ResourceHog, ResourceUsageSummary,
+    RiskLevel, TaskDistribution,
 };
 use crate::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
 use crate::models::ApplicationInfo;
@@ -50,7 +50,11 @@ impl DuckDbStore {
     }
 
     /// Create a new DuckDB store with custom configuration
-    pub async fn new_with_config(db_path: &str, num_workers: usize, _batch_size: usize) -> Result<Self> {
+    pub async fn new_with_config(
+        db_path: &str,
+        num_workers: usize,
+        _batch_size: usize,
+    ) -> Result<Self> {
         let path = Path::new(db_path);
         // Initialize database schema with a temporary connection
         let temp_conn = Connection::open(path)?;
@@ -74,7 +78,10 @@ impl DuckDbStore {
             workers.push(DbWorkerHandle { operation_tx });
         }
 
-        info!("DuckDB workers initialized at: {:?} with {} workers", path, num_workers);
+        info!(
+            "DuckDB workers initialized at: {:?} with {} workers",
+            path, num_workers
+        );
 
         // Create circuit breaker for DuckDB operations
         let circuit_breaker_config = CircuitBreakerConfig {
@@ -95,7 +102,7 @@ impl DuckDbStore {
         })
     }
 
-    /// Initialize database schema 
+    /// Initialize database schema
     async fn initialize_schema(conn: &Connection) -> Result<()> {
         // Install and load JSON extension first - handle potential failures gracefully
         let install_result = conn.execute_batch("INSTALL 'json'");
@@ -202,7 +209,10 @@ impl DuckDbStore {
                 conn
             }
             Err(e) => {
-                error!("Database worker {} failed to create connection: {}", worker_id, e);
+                error!(
+                    "Database worker {} failed to create connection: {}",
+                    worker_id, e
+                );
                 return;
             }
         };
@@ -210,7 +220,10 @@ impl DuckDbStore {
         // Process operations
         while let Some(operation) = operation_rx.recv().await {
             match operation {
-                DbOperation::InsertBatch { events, response_tx } => {
+                DbOperation::InsertBatch {
+                    events,
+                    response_tx,
+                } => {
                     let result = Self::worker_insert_batch(&conn, events, worker_id).await;
                     let _ = response_tx.send(result);
                 }
@@ -234,7 +247,7 @@ impl DuckDbStore {
             return Ok(());
         }
 
-        let start_time = std::time::Instant::now();
+        let _start_time = std::time::Instant::now();
 
         // Use COPY for much faster bulk inserts
         if events.len() > 100 {
@@ -263,20 +276,26 @@ impl DuckDbStore {
             .circuit_breaker
             .call(async {
                 // Round-robin load balancing across workers
-                let worker_idx = self.current_worker
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed) % self.workers.len();
-                
+                let worker_idx = self
+                    .current_worker
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                    % self.workers.len();
+
                 let worker = &self.workers[worker_idx];
-                
+
                 // Send operation to worker
                 let (response_tx, response_rx) = oneshot::channel();
-                worker.operation_tx.send(DbOperation::InsertBatch {
-                    events,
-                    response_tx,
-                }).map_err(|e| anyhow!("Failed to send to worker: {}", e))?;
+                worker
+                    .operation_tx
+                    .send(DbOperation::InsertBatch {
+                        events,
+                        response_tx,
+                    })
+                    .map_err(|e| anyhow!("Failed to send to worker: {}", e))?;
 
                 // Wait for response
-                response_rx.await
+                response_rx
+                    .await
                     .map_err(|e| anyhow!("Worker response error: {}", e))?
             })
             .await;
@@ -296,9 +315,13 @@ impl DuckDbStore {
     }
 
     /// Worker-specific high-performance bulk insert using DuckDB's COPY FROM functionality
-    async fn bulk_insert_with_copy_worker(conn: &Connection, events: Vec<SparkEvent>, worker_id: usize) -> Result<()> {
+    async fn bulk_insert_with_copy_worker(
+        conn: &Connection,
+        events: Vec<SparkEvent>,
+        worker_id: usize,
+    ) -> Result<()> {
         let start_time = std::time::Instant::now();
-        
+
         // Use prepared statements for better performance with worker-dedicated connections
         let mut stmt = conn
             .prepare(
@@ -336,8 +359,13 @@ impl DuckDbStore {
                 conn.execute_batch("COMMIT")?;
                 let duration = start_time.elapsed();
                 let throughput = events.len() as f64 / duration.as_secs_f64();
-                info!("WORKER_{}: Successfully inserted {} events in {:?} ({:.0} events/sec)", 
-                      worker_id, events.len(), duration, throughput);
+                info!(
+                    "WORKER_{}: Successfully inserted {} events in {:?} ({:.0} events/sec)",
+                    worker_id,
+                    events.len(),
+                    duration,
+                    throughput
+                );
                 Ok(())
             }
             Err(e) => {
@@ -348,9 +376,13 @@ impl DuckDbStore {
     }
 
     /// Worker-specific standard batch insert using prepared statements
-    async fn standard_batch_insert_worker(conn: &Connection, events: Vec<SparkEvent>, worker_id: usize) -> Result<()> {
+    async fn standard_batch_insert_worker(
+        conn: &Connection,
+        events: Vec<SparkEvent>,
+        worker_id: usize,
+    ) -> Result<()> {
         let start_time = std::time::Instant::now();
-        
+
         let mut stmt = conn
             .prepare(
                 r#"
@@ -386,7 +418,12 @@ impl DuckDbStore {
             Ok(()) => {
                 conn.execute_batch("COMMIT")?;
                 let duration = start_time.elapsed();
-                debug!("WORKER_{}: Inserted {} events in {:?}", worker_id, events.len(), duration);
+                debug!(
+                    "WORKER_{}: Inserted {} events in {:?}",
+                    worker_id,
+                    events.len(),
+                    duration
+                );
                 Ok(())
             }
             Err(e) => {
@@ -412,14 +449,14 @@ impl DuckDbStore {
     }
 
     /// Get active applications summary for dashboard
-    pub async fn get_active_applications(
+    pub async fn get_active_applications_impl(
         &self,
         limit: Option<usize>,
     ) -> Result<Vec<crate::dashboard::SimpleApplicationSummary>> {
         // Temporary simplified implementation - return mock data for testing
         let limit = limit.unwrap_or(10);
         let mut applications = Vec::with_capacity(limit);
-        
+
         for i in 0..limit {
             applications.push(crate::dashboard::SimpleApplicationSummary {
                 id: format!("app_{}", i),
@@ -430,7 +467,7 @@ impl DuckDbStore {
                 status: "FINISHED".to_string(),
             });
         }
-        
+
         Ok(applications)
     }
 
@@ -445,7 +482,7 @@ impl DuckDbStore {
         // Temporary simplified implementation - return mock data
         let limit = limit.unwrap_or(10);
         let mut applications = Vec::with_capacity(limit);
-        
+
         for i in 0..limit {
             applications.push(ApplicationInfo {
                 id: format!("app_{}", i),
@@ -457,7 +494,7 @@ impl DuckDbStore {
                 attempts: vec![],
             });
         }
-        
+
         Ok(applications)
     }
 
@@ -540,7 +577,7 @@ impl DuckDbStore {
     pub async fn get_capacity_usage_trends(
         &self,
         _params: &crate::analytics_api::AnalyticsQuery,
-    ) -> anyhow::Result<Vec<CapacityTrend>> {
+    ) -> anyhow::Result<Vec<PerformanceTrend>> {
         Ok(vec![])
     }
 
@@ -653,11 +690,38 @@ impl AnalyticalStorageBackend for DuckDbStore {
     }
 
     async fn get_applications(&self, limit: Option<usize>) -> Result<Vec<Value>> {
-        self.get_applications(limit).await
+        let apps = self.get_applications(limit, None, None, None).await?;
+        let values: Vec<Value> = apps
+            .into_iter()
+            .map(|app| serde_json::to_value(app).unwrap_or_default())
+            .collect();
+        Ok(values)
     }
 
     async fn get_application_summary(&self, app_id: &str) -> Result<Option<Value>> {
-        self.get_application(app_id).await.map(|v| Some(v))
+        match self.get(app_id).await? {
+            Some(app) => Ok(Some(serde_json::to_value(app).unwrap_or_default())),
+            None => Ok(None),
+        }
+    }
+
+    async fn get_executors(&self, app_id: &str) -> Result<Vec<Value>> {
+        let executors = self.get_executor_summary(app_id).await?;
+        let values: Vec<Value> = executors
+            .into_iter()
+            .map(|executor| serde_json::to_value(executor).unwrap_or_default())
+            .collect();
+        Ok(values)
+    }
+
+    async fn get_active_applications(&self, limit: Option<usize>) -> Result<Vec<Value>> {
+        // Call the existing method with a different name to avoid recursion
+        let apps = self.get_active_applications_impl(limit).await?;
+        let values: Vec<Value> = apps
+            .into_iter()
+            .map(|app| serde_json::to_value(app).unwrap_or_default())
+            .collect();
+        Ok(values)
     }
 
     /// Health and status operations
@@ -671,7 +735,7 @@ impl AnalyticalStorageBackend for DuckDbStore {
 
     async fn get_backend_stats(&self) -> Result<BackendStats> {
         let mut stats = BackendStats::new(StorageBackendType::DuckDB);
-        
+
         // Get basic statistics
         // Note: These are simplified implementations
         stats.total_events = 0; // Would query: SELECT COUNT(*) FROM events
@@ -683,12 +747,12 @@ impl AnalyticalStorageBackend for DuckDbStore {
 
         // DuckDB-specific metrics
         stats.backend_specific_metrics.insert(
-            "num_workers".to_string(), 
-            Value::Number(serde_json::Number::from(self.workers.len()))
+            "num_workers".to_string(),
+            Value::Number(serde_json::Number::from(self.workers.len())),
         );
         stats.backend_specific_metrics.insert(
             "circuit_breaker_state".to_string(),
-            Value::String("CLOSED".to_string()) // Would check actual state
+            Value::String("CLOSED".to_string()), // Would check actual state
         );
 
         Ok(stats)
@@ -700,7 +764,10 @@ impl AnalyticalStorageBackend for DuckDbStore {
         Ok(CrossAppSummary::default())
     }
 
-    async fn get_performance_trends(&self, _query: &AnalyticsQuery) -> Result<Vec<PerformanceTrend>> {
+    async fn get_performance_trends(
+        &self,
+        _query: &AnalyticsQuery,
+    ) -> Result<Vec<PerformanceTrend>> {
         // Placeholder implementation
         Ok(vec![])
     }
@@ -715,16 +782,22 @@ impl AnalyticalStorageBackend for DuckDbStore {
         Ok(TaskDistribution::default())
     }
 
-    async fn get_efficiency_analysis(&self, _query: &AnalyticsQuery) -> Result<EfficiencyAnalysis> {
+    async fn get_efficiency_analysis(&self, _query: &AnalyticsQuery) -> Result<Vec<EfficiencyAnalysis>> {
         // Placeholder implementation - create a default EfficiencyAnalysis
-        Ok(EfficiencyAnalysis {
-            application_id: "placeholder".to_string(),
+        Ok(vec![EfficiencyAnalysis {
+            app_id: "placeholder".to_string(),
+            app_name: "Placeholder Application".to_string(),
             efficiency_category: EfficiencyCategory::WellTuned,
-            resource_utilization_percent: 75.0,
-            waste_potential_gb: 0.0,
-            optimization_opportunity: "System is well-tuned".to_string(),
+            memory_efficiency: 75.0,
+            memory_efficiency_explanation: "Well-tuned system".to_string(),
+            cpu_efficiency: 80.0,
+            cpu_efficiency_explanation: "Good CPU utilization".to_string(),
+            recommended_memory_gb: Some(8.0),
+            recommended_cpu_cores: Some(4.0),
+            potential_cost_savings: 0.0,
             risk_level: RiskLevel::Low,
-        })
+            optimization_actions: vec!["System is well-tuned".to_string()],
+        }])
     }
 
     async fn get_resource_hogs(&self, query: &AnalyticsQuery) -> Result<Vec<ResourceHog>> {
@@ -734,13 +807,16 @@ impl AnalyticalStorageBackend for DuckDbStore {
     async fn get_cost_optimization(&self, _query: &AnalyticsQuery) -> Result<CostOptimization> {
         // Placeholder implementation - create a default CostOptimization
         Ok(CostOptimization {
-            application_id: "placeholder".to_string(),
-            current_cost_usd: 0.0,
-            potential_savings_usd: 0.0,
             optimization_type: OptimizationType::ReduceExecutors,
-            confidence_score: 0.5,
-            implementation_effort: DifficultyLevel::Easy,
-            description: "No optimization opportunities identified".to_string(),
+            app_id: "placeholder".to_string(),
+            app_name: "Placeholder Application".to_string(),
+            current_cost: 0.0,
+            optimized_cost: 0.0,
+            savings_percentage: 0.0,
+            confidence_score: 50.0,
+            implementation_difficulty: DifficultyLevel::Easy,
+            optimization_details: "No optimization opportunities identified".to_string(),
+            formatted_savings: "$0.00".to_string(),
         })
     }
 
