@@ -11,49 +11,12 @@ use serde::Deserialize;
 use crate::analytics_api::{CostOptimization, EfficiencyAnalysis, ResourceHog};
 use crate::storage::HistoryProvider;
 
-#[derive(Clone)]
-pub struct SimpleCrossAppSummary {
-    pub total_applications: i64,
-    pub active_applications: i64,
-    pub total_events: i64,
-    pub total_tasks_completed: i64,
-    pub total_tasks_failed: i64,
-    pub avg_task_duration_ms: String,
-    pub total_data_processed_gb: String,
-    pub peak_concurrent_executors: i64,
-}
-
-impl Default for SimpleCrossAppSummary {
-    fn default() -> Self {
-        Self {
-            total_applications: 0,
-            active_applications: 0,
-            total_events: 0,
-            total_tasks_completed: 0,
-            total_tasks_failed: 0,
-            avg_task_duration_ms: "0".to_string(),
-            total_data_processed_gb: "0".to_string(),
-            peak_concurrent_executors: 0,
-        }
-    }
-}
-
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct CapacityTrendForTemplate {
     pub date: String,
     pub total_memory_gb_used: f64,
     pub total_cpu_cores_used: f64,
     pub peak_concurrent_applications: u32,
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct SimpleApplicationSummary {
-    pub id: String,
-    pub user: String,
-    pub duration: String,
-    pub cores: u32,
-    pub memory: u32,
-    pub status: String,
 }
 
 #[derive(Clone)]
@@ -64,13 +27,6 @@ pub struct SummaryStats {
     pub potential_monthly_savings: String,
     pub apps_needing_optimization: usize,
     pub high_confidence_optimizations: usize,
-}
-
-#[derive(Template)]
-#[template(path = "enhanced_simple.html")]
-struct ClusterTemplate {
-    cross_app_summary: SimpleCrossAppSummary,
-    active_applications: Vec<SimpleApplicationSummary>,
 }
 
 #[derive(Template)]
@@ -90,75 +46,10 @@ pub struct DashboardQuery {
 
 pub fn dashboard_router() -> Router<HistoryProvider> {
     Router::new()
-        .route("/", get(cluster_overview))
-        .route("/cluster", get(cluster_overview))
+        .route("/", get(optimize_view))
         .route("/resources", get(resources_view))
         .route("/optimize", get(optimize_view))
         .route("/teams", get(teams_view))
-}
-
-pub async fn cluster_overview(
-    Query(_params): Query<DashboardQuery>,
-    State(provider): State<HistoryProvider>,
-) -> Result<Html<String>, StatusCode> {
-    // Fetch real cross-app summary data
-    let cross_app_summary = provider
-        .get_cross_app_summary(&crate::analytics_api::AnalyticsQuery {
-            start_date: None,
-            end_date: None,
-            limit: None,
-            app_id: None,
-        })
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to get cross app summary: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    // Fetch real active applications data
-    let active_applications_values =
-        provider
-            .get_active_applications(Some(10))
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to get active applications: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-
-    let active_applications: Result<Vec<SimpleApplicationSummary>, _> = active_applications_values
-        .into_iter()
-        .map(serde_json::from_value)
-        .collect();
-
-    let active_applications = active_applications.map_err(|e| {
-        tracing::error!("Failed to deserialize active applications: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    // Convert CrossAppSummary to SimpleCrossAppSummary
-    let simple_cross_app_summary = SimpleCrossAppSummary {
-        total_applications: cross_app_summary.total_applications as i64,
-        active_applications: cross_app_summary.active_applications as i64,
-        total_events: cross_app_summary.total_events as i64,
-        total_tasks_completed: 0,
-        total_tasks_failed: 0,
-        avg_task_duration_ms: format!("{:.2}ms", cross_app_summary.average_duration_ms),
-        total_data_processed_gb: "0".to_string(),
-        peak_concurrent_executors: 0,
-    };
-
-    let template = ClusterTemplate {
-        cross_app_summary: simple_cross_app_summary,
-        active_applications,
-    };
-
-    match template.render() {
-        Ok(html) => Ok(Html(html)),
-        Err(e) => {
-            tracing::error!("Template render error: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
 }
 
 pub async fn optimize_view(

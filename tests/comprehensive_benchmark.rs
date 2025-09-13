@@ -1,6 +1,7 @@
 #![cfg(feature = "performance-tests")]
 
 use serde_json::json;
+use spark_history_server::storage::AnalyticalStorageBackend;
 use std::fs;
 use std::time::{Duration, Instant};
 use tempfile::{NamedTempFile, TempDir};
@@ -194,7 +195,7 @@ impl ComprehensiveBenchmark {
             };
 
             let _trends = store.get_capacity_usage_trends(&params).await?;
-            let _summary = store.get_cross_app_summary().await?;
+            let _summary = store.get_cross_app_summary(&params).await?;
         }
 
         let duration = start_time.elapsed();

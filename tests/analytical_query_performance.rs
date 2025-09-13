@@ -1,5 +1,6 @@
 #![cfg(feature = "performance-tests")]
 
+use spark_history_server::storage::AnalyticalStorageBackend;
 use std::collections::HashMap;
 use std::fs;
 use std::time::{Duration, Instant};
@@ -87,13 +88,13 @@ async fn test_analytical_query_performance_100k_apps() {
     // Test 1: Cross-Application Summary Query
     println!("\n📊 Test 1: Cross-Application Summary");
     let query_start = Instant::now();
-    let _params = AnalyticsQuery {
+    let params = AnalyticsQuery {
         start_date: None,
         end_date: None,
         app_id: None,
         limit: Some(100),
     };
-    let summary = store.get_cross_app_summary().await.unwrap();
+    let summary = store.get_cross_app_summary(&params).await.unwrap();
     let query_duration = query_start.elapsed();
 
     println!("Results:");
@@ -421,13 +422,13 @@ async fn test_concurrent_analytical_queries() {
                 let result = match query_num % 5 {
                     0 => {
                         // Cross-app summary
-                        let _params = AnalyticsQuery {
+                        let params = AnalyticsQuery {
                             start_date: None,
                             end_date: None,
                             app_id: None,
                             limit: Some(50),
                         };
-                        let summary = store_clone.get_cross_app_summary().await.unwrap();
+                        let summary = store_clone.get_cross_app_summary(&params).await.unwrap();
                         ("cross_app_summary", summary.total_events as usize)
                     }
                     1 => {

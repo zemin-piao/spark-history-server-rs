@@ -446,44 +446,6 @@ impl DuckDbStore {
         }
     }
 
-    /// Get cross-application summary statistics
-    pub async fn get_cross_app_summary(&self) -> Result<crate::dashboard::SimpleCrossAppSummary> {
-        // Temporary simplified implementation - return mock data for testing
-        Ok(crate::dashboard::SimpleCrossAppSummary {
-            total_applications: 100,
-            active_applications: 50,
-            total_events: 1000000,
-            total_tasks_completed: 50000,
-            total_tasks_failed: 500,
-            avg_task_duration_ms: "2500".to_string(),
-            total_data_processed_gb: "50.2".to_string(),
-            peak_concurrent_executors: 200,
-        })
-    }
-
-    /// Get active applications summary for dashboard
-    pub async fn get_active_applications_impl(
-        &self,
-        limit: Option<usize>,
-    ) -> Result<Vec<crate::dashboard::SimpleApplicationSummary>> {
-        // Temporary simplified implementation - return mock data for testing
-        let limit = limit.unwrap_or(10);
-        let mut applications = Vec::with_capacity(limit);
-
-        for i in 0..limit {
-            applications.push(crate::dashboard::SimpleApplicationSummary {
-                id: format!("app_{}", i),
-                user: "system".to_string(),
-                duration: "120s".to_string(),
-                cores: 4,
-                memory: 8192,
-                status: "FINISHED".to_string(),
-            });
-        }
-
-        Ok(applications)
-    }
-
     /// Get all applications with filtering support  
     pub async fn get_applications(
         &self,
@@ -733,8 +695,8 @@ impl AnalyticalStorageBackend for DuckDbStore {
     }
 
     async fn get_active_applications(&self, limit: Option<usize>) -> Result<Vec<Value>> {
-        // Call the existing method with a different name to avoid recursion
-        let apps = self.get_active_applications_impl(limit).await?;
+        // Get applications and convert to JSON values
+        let apps = self.get_applications(limit, None, None, None).await?;
         let values: Vec<Value> = apps
             .into_iter()
             .map(|app| serde_json::to_value(app).unwrap_or_default())
