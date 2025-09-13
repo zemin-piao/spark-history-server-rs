@@ -8,7 +8,10 @@ mod performance_monitor;
 use load_test_utils::SyntheticDataGenerator;
 #[cfg(feature = "performance-tests")]
 use performance_monitor::PerformanceMonitor;
-use spark_history_server::storage::duckdb_store::{DuckDbStore, SparkEvent};
+use spark_history_server::{
+    analytics_api::AnalyticsQuery,
+    storage::{duckdb_store::{DuckDbStore, SparkEvent}, AnalyticalStorageBackend},
+};
 
 #[tokio::test]
 async fn test_quick_analytical_query_demo() {
@@ -107,11 +110,19 @@ async fn test_quick_analytical_query_demo() {
     // Query 4: Resource usage summary
     print!("💾 Resource Usage Summary: ");
     let query_start = Instant::now();
-    let resource_usage = store.get_resource_usage_summary().await.unwrap();
+    let query = AnalyticsQuery {
+        start_date: None,
+        end_date: None,
+        limit: None,
+        app_id: None,
+    };
+    let resource_usage = store.get_resource_usage(&query).await.unwrap();
     let query_time = query_start.elapsed();
     println!(
-        "{} records in {:.0}ms",
-        resource_usage.len(),
+        "CPU: {:.1}%, Memory: {:.1}%, Peak: {:.1}GB in {:.0}ms",
+        resource_usage.cpu_utilization_percent,
+        resource_usage.memory_utilization_percent,
+        resource_usage.peak_memory_usage_gb,
         query_time.as_millis()
     );
 

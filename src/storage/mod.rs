@@ -1,5 +1,7 @@
-/// Storage backend abstraction for analytical data processing
-/// Supports multiple backends (DuckDB, ClickHouse, PostgreSQL, etc.)
+#![allow(dead_code)]
+//! Storage backend abstraction for analytical data processing
+//! Supports multiple backends (DuckDB, ClickHouse, PostgreSQL, etc.)
+
 use anyhow::Result;
 
 pub mod backend_trait;

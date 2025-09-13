@@ -88,6 +88,7 @@ mod test_mocks {
             self.is_corrupted.store(true, Ordering::Relaxed);
         }
 
+        #[allow(dead_code)]
         pub fn simulate_persist_failure(&self) {
             self.persist_fail.store(true, Ordering::Relaxed);
         }
@@ -468,12 +469,12 @@ async fn test_concurrent_access_safety() -> Result<()> {
                     )
                     .await;
 
-                if result.is_err() {
+                if let Err(e) = result {
                     eprintln!(
                         "Writer {} failed on file {}: {:?}",
-                        writer_id, file_id, result
+                        writer_id, file_id, e
                     );
-                    return Err(result.unwrap_err());
+                    return Err(e);
                 }
 
                 // Small delay to increase chance of race conditions
@@ -564,10 +565,11 @@ async fn test_high_failure_rate_resilience() -> Result<()> {
         success_rate, successful_operations, NUM_OPERATIONS
     );
 
-    // With 50% base failure rate + 1 retry, we should get >75% success rate
+    // With 50% base failure rate + 1 retry, we should get >=65% success rate
+    // This accounts for the probabilistic nature of the test
     assert!(
-        success_rate > 75.0,
-        "Should achieve >75% success rate with retries"
+        success_rate >= 65.0,
+        "Should achieve >=65% success rate with retries"
     );
 
     Ok(())

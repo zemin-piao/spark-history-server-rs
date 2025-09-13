@@ -7,7 +7,7 @@ use tracing::info;
 use spark_history_server::{
     api::create_app,
     models::{ApplicationInfo, VersionInfo},
-    storage::HistoryProvider,
+    storage::{StorageBackendFactory, StorageConfig},
 };
 mod test_config;
 use test_config::create_test_config;
@@ -26,10 +26,17 @@ async fn test_integration_full_workflow() -> Result<()> {
     init_test_tracing();
 
     // Setup test configuration
-    let (config, _) = create_test_config();
+    let (config, _temp_dir) = create_test_config();
 
     // Create history provider
-    let history_provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
 
     // Create the app
     let app = create_app(history_provider).await?;
@@ -158,9 +165,16 @@ async fn test_integration_full_workflow() -> Result<()> {
 #[tokio::test]
 async fn test_date_filtering() -> Result<()> {
     init_test_tracing();
-    let (config, _) = create_test_config();
+    let (config, _temp_dir) = create_test_config();
 
-    let history_provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
     let app = create_app(history_provider).await?;
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -197,9 +211,16 @@ async fn test_date_filtering() -> Result<()> {
 #[tokio::test]
 async fn test_cors_headers() -> Result<()> {
     init_test_tracing();
-    let (config, _) = create_test_config();
+    let (config, _temp_dir) = create_test_config();
 
-    let history_provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
     let app = create_app(history_provider).await?;
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;

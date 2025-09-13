@@ -12,6 +12,12 @@ type AppStartData = (String, String, String, Option<String>, String);
 #[derive(Clone)]
 pub struct EventLogParser;
 
+impl Default for EventLogParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventLogParser {
     pub fn new() -> Self {
         Self

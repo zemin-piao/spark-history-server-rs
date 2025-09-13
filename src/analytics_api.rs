@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -31,6 +33,7 @@ pub fn analytics_router() -> Router<HistoryProvider> {
 
 /// Query parameters for analytics endpoints
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct AnalyticsQuery {
     #[serde(rename = "startDate")]
     pub start_date: Option<String>,

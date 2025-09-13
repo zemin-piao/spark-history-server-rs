@@ -126,8 +126,8 @@ async fn test_analytical_query_performance_100k_apps() {
 
     if let Some(first_trend) = trends.first() {
         println!(
-            "  Sample trend - Date: {}, Total memory used: {:.1}GB",
-            first_trend.date, first_trend.total_memory_gb_used
+            "  Sample trend - Timestamp: {}, Metric: {} = {:.1}",
+            first_trend.timestamp, first_trend.metric_name, first_trend.metric_value
         );
     }
 

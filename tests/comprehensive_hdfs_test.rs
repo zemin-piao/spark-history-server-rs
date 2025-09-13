@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 use spark_history_server::{
     config::{HdfsConfig, HistoryConfig, KerberosConfig},
-    storage::{file_reader::FileReader, HistoryProvider},
+    storage::{file_reader::FileReader, StorageBackendFactory, StorageConfig},
 };
 
 /// Comprehensive HDFS integration tests covering various scenarios
@@ -375,7 +375,14 @@ async fn test_history_provider_hdfs_integration() -> Result<()> {
     };
 
     // This will attempt to create HDFS client (may fail in test environment)
-    let result = HistoryProvider::new(history_config).await;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: history_config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let result = StorageBackendFactory::create_backend(storage_config).await;
 
     match result {
         Ok(_provider) => {

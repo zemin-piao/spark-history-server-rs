@@ -125,6 +125,7 @@ mod real_s3_tests {
     use super::*;
     use std::env;
 
+    #[allow(dead_code)]
     fn get_test_s3_config() -> Option<S3Config> {
         let bucket = env::var("S3_TEST_BUCKET").ok()?;
         let region = env::var("AWS_REGION").ok();

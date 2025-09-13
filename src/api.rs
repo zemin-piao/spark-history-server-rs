@@ -106,7 +106,7 @@ async fn list_applications(
             info!("Returning {} applications", applications.len());
             let apps: Result<Vec<ApplicationInfo>, _> = applications
                 .into_iter()
-                .map(|v| serde_json::from_value(v))
+                .map(serde_json::from_value)
                 .collect();
             match apps {
                 Ok(apps) => Ok(Json(apps)),
@@ -174,7 +174,7 @@ async fn get_application_executors(
         Ok(executor_values) => {
             let executors: Result<Vec<crate::models::ExecutorSummary>, _> = executor_values
                 .into_iter()
-                .map(|v| serde_json::from_value(v))
+                .map(serde_json::from_value)
                 .collect();
             match executors {
                 Ok(executors) => {

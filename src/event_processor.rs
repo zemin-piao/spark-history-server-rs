@@ -17,7 +17,9 @@ pub struct EventProcessor {
     duckdb_store: Arc<DuckDbStore>,
     metadata_store: Arc<MetadataStore>,
     base_path: String,
+    #[allow(dead_code)]
     batch_size: usize,
+    #[allow(dead_code)]
     flush_interval_secs: u64,
     scan_interval_secs: u64,
 }

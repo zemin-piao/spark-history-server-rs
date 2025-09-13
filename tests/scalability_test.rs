@@ -1,12 +1,11 @@
 /// Scalability test for the multi-writer DuckDB architecture
 /// Tests write performance with simulated 40K application load
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::json;
 use spark_history_server::storage::duckdb_store::{DuckDbStore, SparkEvent};
 use std::sync::Arc;
 use std::time::Instant;
 use tempfile::tempdir;
-use tokio::sync::mpsc;
 
 /// Generate a realistic Spark event for testing
 fn generate_spark_event(app_id: &str, event_id: i64, event_type: &str) -> SparkEvent {

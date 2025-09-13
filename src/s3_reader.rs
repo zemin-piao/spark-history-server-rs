@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::{anyhow, Result};
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::retry::RetryConfig;

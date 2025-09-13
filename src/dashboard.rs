@@ -120,7 +120,7 @@ pub async fn cluster_overview(
     
     let active_applications: Result<Vec<SimpleApplicationSummary>, _> = active_applications_values
         .into_iter()
-        .map(|v| serde_json::from_value(v))
+        .map(serde_json::from_value)
         .collect();
     
     let active_applications = active_applications.map_err(|e| {

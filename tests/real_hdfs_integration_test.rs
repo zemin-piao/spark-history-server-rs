@@ -6,7 +6,6 @@ use spark_history_server::{
     config::{HdfsConfig, HistoryConfig, KerberosConfig},
     storage::{
         file_reader::{create_file_reader, FileReader, HdfsFileReader},
-        HistoryProvider,
     },
 };
 
@@ -365,9 +364,16 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     println!("Initializing HistoryProvider (this may take a while)...");
     let start_time = std::time::Instant::now();
 
+    // Create history provider using the factory
+    use spark_history_server::storage::{StorageBackendFactory, StorageConfig};
+    let storage_config = StorageConfig::DuckDB {
+        database_path: "./data/test_events.db".to_string(),
+        num_workers: 8,
+        batch_size: 5000,
+    };
     let history_provider = match timeout(
         Duration::from_secs(300),
-        HistoryProvider::new(history_config),
+        StorageBackendFactory::create_backend(storage_config),
     )
     .await
     {
@@ -392,28 +398,31 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     println!();
     println!("Testing application retrieval...");
     let applications = history_provider
-        .get_applications(
-            Some(10), // Limit to 10 applications
-            None,     // No status filter
-            None,     // No date filters
-            None,
-            None,
-            None,
-        )
+        .get_applications(Some(10)) // Limit to 10 applications
         .await?;
 
     println!("Retrieved {} applications:", applications.len());
 
     for (i, app) in applications.iter().enumerate() {
-        println!("  {}. Application: {}", i + 1, app.id);
-        println!("     Name: {}", app.name);
-        println!("     Attempts: {}", app.attempts.len());
+        let app_id = app.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let app_name = app.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let empty_vec = vec![];
+        let attempts = app.get("attempts").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
+        
+        println!("  {}. Application: {}", i + 1, app_id);
+        println!("     Name: {}", app_name);
+        println!("     Attempts: {}", attempts.len());
 
-        if let Some(attempt) = app.attempts.first() {
-            println!("     Start Time: {}", attempt.start_time);
-            println!("     End Time: {}", attempt.end_time);
-            println!("     Duration: {:.2}s", attempt.duration);
-            println!("     Completed: {}", attempt.completed);
+        if let Some(attempt) = attempts.first() {
+            let start_time = attempt.get("start_time").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let end_time = attempt.get("end_time").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let duration = attempt.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let completed = attempt.get("completed").and_then(|v| v.as_bool()).unwrap_or(false);
+            
+            println!("     Start Time: {}", start_time);
+            println!("     End Time: {}", end_time);
+            println!("     Duration: {:.2}s", duration);
+            println!("     Completed: {}", completed);
         }
 
         println!();
@@ -422,44 +431,53 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     if !applications.is_empty() {
         println!("Testing individual application retrieval...");
         let test_app = &applications[0];
-        let app_detail = history_provider.get_application(&test_app.id).await?;
+        let test_app_id = test_app.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let app_detail = history_provider.get_application_summary(test_app_id).await?;
 
         match app_detail {
             Some(app) => {
+                let app_id = app.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let app_name = app.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let empty_vec = vec![];
+        let attempts = app.get("attempts").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
+                
                 println!(
                     "✅ Successfully retrieved application details for {}",
-                    app.id
+                    app_id
                 );
-                println!("   Name: {}", app.name);
-                println!("   Attempts: {}", app.attempts.len());
+                println!("   Name: {}", app_name);
+                println!("   Attempts: {}", attempts.len());
             }
             None => {
-                println!("⚠️ Application details not found for {}", test_app.id);
+                println!("⚠️ Application details not found for {}", test_app_id);
             }
         }
 
         println!();
         println!("Testing executor information...");
-        let executors = history_provider.get_executors(&test_app.id).await?;
+        let executors = history_provider.get_executors(test_app_id).await?;
         println!(
             "Found {} executors for application {}",
             executors.len(),
-            test_app.id
+            test_app_id
         );
 
         for executor in executors.iter().take(3) {
+            let exec_id = executor.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let total_cores = executor.get("total_cores").and_then(|v| v.as_i64()).unwrap_or(0);
+            let max_memory = executor.get("max_memory").and_then(|v| v.as_str()).unwrap_or("0");
+            
             println!(
                 "  Executor {}: {} cores, {} MB memory",
-                executor.id, executor.total_cores, executor.max_memory
+                exec_id, total_cores, max_memory
             );
         }
     }
 
     println!();
-    println!("Testing DuckDB analytics integration...");
-    let duckdb_store = history_provider.get_duckdb_store();
-    let stored_apps = duckdb_store.list().await?;
-    println!("DuckDB contains {} stored applications", stored_apps.len());
+    println!("Testing analytics backend integration...");
+    let stored_apps = history_provider.get_applications(None).await?;
+    println!("Analytics backend contains {} stored applications", stored_apps.len());
 
     println!();
     println!("Performance Summary:");

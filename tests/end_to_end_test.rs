@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use spark_history_server::{api::create_app, models::ApplicationInfo, storage::HistoryProvider};
+use spark_history_server::{api::create_app, models::ApplicationInfo, storage::{StorageBackendFactory, StorageConfig}};
 
 mod test_config;
 use test_config::create_test_config;
@@ -10,10 +10,17 @@ use test_config::create_test_config;
 #[tokio::test]
 async fn test_end_to_end_with_real_data() -> Result<()> {
     // Use the test event logs directory
-    let (config, _) = create_test_config();
+    let (config, _temp_dir) = create_test_config();
 
     println!("Creating history provider with test data...");
-    let history_provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
 
     // Give it a moment to scan the event logs
     sleep(Duration::from_millis(500)).await;
@@ -103,9 +110,16 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
 #[tokio::test]
 async fn test_performance_and_concurrent_requests() -> Result<()> {
     let _test_id = format!("perf_test_{}", std::process::id());
-    let (config, _) = create_test_config();
+    let (config, _temp_dir) = create_test_config();
 
-    let history_provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
     let app = create_app(history_provider).await?;
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;

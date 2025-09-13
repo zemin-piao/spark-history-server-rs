@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use spark_history_server::{api::create_app, storage::HistoryProvider};
+use spark_history_server::{api::create_app, storage::{HistoryProvider, StorageBackendFactory, StorageConfig}};
 mod test_config;
 use test_config::create_test_config;
 
@@ -40,7 +40,14 @@ async fn setup_test_environment() -> Result<(HistoryProvider, tempfile::TempDir)
         event_log_content,
     )?;
 
-    let history_provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
 
     // Give it a moment to process the events
     sleep(Duration::from_millis(200)).await;
@@ -147,14 +154,12 @@ async fn test_platform_engineering_endpoints() -> Result<()> {
         .await?;
     assert_eq!(response.status(), 200);
     let json: Value = response.json().await?;
-    assert!(json.is_array());
-    if let Some(first_result) = json.as_array().and_then(|arr| arr.first()) {
-        assert!(first_result.get("app_id").is_some());
-        assert!(first_result.get("optimization_type").is_some());
-        assert!(first_result.get("current_cost").is_some());
-        assert!(first_result.get("savings_percentage").is_some());
-        assert!(first_result.get("confidence_score").is_some());
-    }
+    assert!(json.is_object());
+    assert!(json.get("app_id").is_some());
+    assert!(json.get("optimization_type").is_some());
+    assert!(json.get("current_cost").is_some());
+    assert!(json.get("savings_percentage").is_some());
+    assert!(json.get("confidence_score").is_some());
     println!("✅ Cost optimization endpoint passed");
 
     // All platform engineering endpoint tests passed!
