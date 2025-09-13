@@ -10,6 +10,7 @@ pub fn mock_hdfs_config() -> HistoryConfig {
         database_directory: None,
         hdfs: None,
         s3: None,
+        circuit_breaker: None,
     }
 }
 
@@ -23,6 +24,7 @@ pub fn test_hdfs_config() -> HistoryConfig {
         database_directory: None,
         hdfs: None,
         s3: None,
+        circuit_breaker: None,
     }
 }
 
@@ -36,6 +38,7 @@ pub fn large_scale_hdfs_config() -> HistoryConfig {
         database_directory: None,
         hdfs: None,
         s3: None,
+        circuit_breaker: None,
     }
 }
 

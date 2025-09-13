@@ -372,6 +372,7 @@ async fn test_history_provider_hdfs_integration() -> Result<()> {
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config),
         s3: None,
+        circuit_breaker: None,
     };
 
     // This will attempt to create HDFS client (may fail in test environment)

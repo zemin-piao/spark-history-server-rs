@@ -396,6 +396,7 @@ impl ComprehensiveBenchmark {
             database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
             hdfs: None,
             s3: None,
+            circuit_breaker: None, // Disabled for performance tests
         };
 
         let storage_config = StorageConfig::DuckDB {

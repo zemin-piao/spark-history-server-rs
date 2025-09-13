@@ -4,7 +4,6 @@ use chrono::Utc;
 use duckdb::{params, Connection};
 use serde_json::Value;
 use std::path::Path;
-use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, error, info, warn};
 
@@ -13,7 +12,7 @@ use crate::analytics_api::{
     EfficiencyCategory, OptimizationType, PerformanceTrend, ResourceHog, ResourceUsageSummary,
     RiskLevel, TaskDistribution,
 };
-use crate::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
+use crate::circuit_breaker::OptionalCircuitBreaker;
 use crate::models::ApplicationInfo;
 use crate::storage::backend_trait::{AnalyticalStorageBackend, BackendStats, StorageBackendType};
 
@@ -39,7 +38,7 @@ pub struct DbWorkerHandle {
 /// DuckDB-based storage for Spark events with analytics capabilities
 pub struct DuckDbStore {
     workers: Vec<DbWorkerHandle>,
-    circuit_breaker: Arc<CircuitBreaker>,
+    circuit_breaker: OptionalCircuitBreaker,
     current_worker: std::sync::atomic::AtomicUsize,
     // Simple counter for testing purposes
     event_count: std::sync::atomic::AtomicI64,
@@ -49,7 +48,7 @@ pub struct DuckDbStore {
 impl DuckDbStore {
     /// Create a new DuckDB store with worker-based architecture
     pub async fn new(db_path: &Path) -> Result<Self> {
-        Self::new_with_config(db_path.to_string_lossy().as_ref(), 8, 5000).await
+        Self::new_with_config(db_path.to_string_lossy().as_ref(), 8, 5000, None).await
     }
 
     /// Create a new DuckDB store with custom configuration
@@ -57,6 +56,7 @@ impl DuckDbStore {
         db_path: &str,
         num_workers: usize,
         _batch_size: usize,
+        circuit_breaker_config: Option<crate::config::CircuitBreakerConfig>,
     ) -> Result<Self> {
         let path = Path::new(db_path);
         // Initialize database schema with a temporary connection
@@ -86,17 +86,11 @@ impl DuckDbStore {
             path, num_workers
         );
 
-        // Create circuit breaker for DuckDB operations
-        let circuit_breaker_config = CircuitBreakerConfig {
-            failure_threshold: 10,
-            success_threshold: 5,
-            timeout_duration: std::time::Duration::from_secs(15),
-            window_duration: std::time::Duration::from_secs(60),
-        };
-        let circuit_breaker = Arc::new(CircuitBreaker::new(
-            format!("duckdb-workers-{}", path.display()),
+        // Create optional circuit breaker for DuckDB operations
+        let circuit_breaker = OptionalCircuitBreaker::new(
             circuit_breaker_config,
-        ));
+            format!("duckdb-workers-{}", path.display()),
+        );
 
         Ok(Self {
             workers,

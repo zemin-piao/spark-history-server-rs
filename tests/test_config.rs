@@ -11,6 +11,7 @@ pub fn create_test_config() -> (HistoryConfig, tempfile::TempDir) {
         database_directory: Some(temp_dir.path().to_str().unwrap().to_string()),
         hdfs: None,
         s3: None,
+        circuit_breaker: None, // Disabled for tests by default
     };
     (config, temp_dir)
 }

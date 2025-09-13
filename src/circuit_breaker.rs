@@ -36,6 +36,17 @@ impl Default for CircuitBreakerConfig {
     }
 }
 
+impl From<crate::config::CircuitBreakerConfig> for CircuitBreakerConfig {
+    fn from(config: crate::config::CircuitBreakerConfig) -> Self {
+        Self {
+            failure_threshold: config.failure_threshold,
+            success_threshold: config.success_threshold,
+            timeout_duration: Duration::from_secs(config.timeout_duration_secs),
+            window_duration: Duration::from_secs(config.window_duration_secs),
+        }
+    }
+}
+
 /// Circuit breaker implementation for external dependencies
 pub struct CircuitBreaker {
     config: CircuitBreakerConfig,
@@ -233,6 +244,37 @@ impl<E> CircuitBreakerError<E> {
         match self {
             CircuitBreakerError::CallFailed(e) => Some(e),
             CircuitBreakerError::CircuitOpen => None,
+        }
+    }
+}
+
+/// Optional circuit breaker that can be disabled for performance
+pub enum OptionalCircuitBreaker {
+    Enabled(Arc<CircuitBreaker>),
+    Disabled,
+}
+
+impl OptionalCircuitBreaker {
+    pub fn new(config: Option<crate::config::CircuitBreakerConfig>, name: String) -> Self {
+        match config {
+            Some(cfg) if cfg.enabled => {
+                let cb_config = CircuitBreakerConfig::from(cfg);
+                Self::Enabled(Arc::new(CircuitBreaker::new(name, cb_config)))
+            }
+            _ => Self::Disabled,
+        }
+    }
+
+    pub async fn call<F, T, E>(&self, f: F) -> Result<T, CircuitBreakerError<E>>
+    where
+        F: std::future::Future<Output = Result<T, E>>,
+    {
+        match self {
+            Self::Enabled(cb) => cb.call(f).await,
+            Self::Disabled => match f.await {
+                Ok(value) => Ok(value),
+                Err(e) => Err(CircuitBreakerError::CallFailed(e)),
+            },
         }
     }
 }

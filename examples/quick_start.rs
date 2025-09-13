@@ -25,6 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             database_directory: None,
             hdfs: None,
             s3: None,
+            circuit_breaker: None, // Disabled for simple example
         },
     };
 

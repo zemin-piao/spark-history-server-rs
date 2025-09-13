@@ -9,5 +9,12 @@ max_applications = 1000
 update_interval_seconds = 60
 max_apps_per_request = 100
 compression_enabled = true
-cache_directory = "./data"
-enable_cache = true
+database_directory = "./data"
+
+# Circuit breaker configuration for fault tolerance
+[history.circuit_breaker]
+enabled = true                  # Set to false to disable circuit breaker for maximum performance
+failure_threshold = 10          # Number of failures before opening circuit
+success_threshold = 5           # Number of successes needed to close circuit from half-open
+timeout_duration_secs = 15      # Time to wait before trying half-open (in seconds)
+window_duration_secs = 60       # Time window for counting failures (in seconds)

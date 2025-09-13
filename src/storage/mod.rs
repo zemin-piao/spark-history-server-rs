@@ -57,14 +57,27 @@ impl StorageBackendFactory {
     pub async fn create_backend(
         config: StorageConfig,
     ) -> Result<std::sync::Arc<dyn AnalyticalStorageBackend + Send + Sync>> {
+        Self::create_backend_with_circuit_breaker(config, None).await
+    }
+
+    /// Create a storage backend from configuration with optional circuit breaker config
+    pub async fn create_backend_with_circuit_breaker(
+        config: StorageConfig,
+        circuit_breaker_config: Option<crate::config::CircuitBreakerConfig>,
+    ) -> Result<std::sync::Arc<dyn AnalyticalStorageBackend + Send + Sync>> {
         match config {
             StorageConfig::DuckDB {
                 database_path,
                 num_workers,
                 batch_size,
             } => {
-                let store =
-                    DuckDbStore::new_with_config(&database_path, num_workers, batch_size).await?;
+                let store = DuckDbStore::new_with_config(
+                    &database_path,
+                    num_workers,
+                    batch_size,
+                    circuit_breaker_config,
+                )
+                .await?;
                 Ok(std::sync::Arc::new(store))
             }
             StorageConfig::ClickHouse { .. } => {

@@ -153,6 +153,7 @@ async fn test_history_provider_with_local_reader() -> Result<()> {
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None, // This forces local file reader selection
         s3: None,
+        circuit_breaker: None,
     };
 
     // Create history provider using the factory
@@ -221,6 +222,7 @@ async fn test_history_provider_with_hdfs_config() -> Result<()> {
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config), // This forces HDFS file reader selection
         s3: None,
+        circuit_breaker: None,
     };
 
     // Create history provider using the factory
@@ -320,6 +322,7 @@ async fn test_configuration_precedence() -> Result<()> {
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None,
         s3: None,
+        circuit_breaker: None,
     };
 
     assert!(default_config.hdfs.is_none());
@@ -340,6 +343,7 @@ async fn test_configuration_precedence() -> Result<()> {
             kerberos: None,
         }),
         s3: None,
+        circuit_breaker: None,
     };
 
     assert!(hdfs_override_config.hdfs.is_some());

@@ -348,6 +348,7 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: Some(hdfs_config),
         s3: None,
+        circuit_breaker: None,
     };
 
     println!("Creating HistoryProvider with HDFS configuration...");

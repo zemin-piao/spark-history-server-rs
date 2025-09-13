@@ -54,6 +54,7 @@ async fn benchmark_baseline_performance() -> Result<()> {
                 &batch_db_path.to_string_lossy(),
                 16, // More workers for better performance
                 1000,
+                None, // Disable circuit breaker for performance tests
             )
             .await?,
         );
@@ -139,6 +140,7 @@ async fn benchmark_concurrent_write_performance() -> Result<()> {
             &db_path.to_string_lossy(),
             16, // More workers for concurrent writes
             500,
+            None, // Disable circuit breaker for performance tests
         )
         .await?,
     );
@@ -366,6 +368,7 @@ async fn stress_test_production_load() -> Result<()> {
             &db_path.to_string_lossy(),
             32, // Maximum workers for stress testing
             500,
+            None, // Disable circuit breaker for stress tests
         )
         .await?,
     );

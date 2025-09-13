@@ -105,6 +105,7 @@ async fn setup_test_server_with_data(num_events: usize) -> (String, TempDir) {
         database_directory: Some(temp_dir.path().to_string_lossy().to_string()),
         hdfs: None,
         s3: None,
+        circuit_breaker: None,
     };
 
     let storage_config = StorageConfig::DuckDB {

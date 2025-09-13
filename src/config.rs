@@ -40,6 +40,9 @@ pub struct HistoryConfig {
 
     /// S3 configuration (optional)
     pub s3: Option<S3Config>,
+
+    /// Circuit breaker configuration (optional)
+    pub circuit_breaker: Option<CircuitBreakerConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +102,36 @@ pub struct S3Config {
     pub read_timeout_ms: Option<u64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CircuitBreakerConfig {
+    /// Enable circuit breaker functionality
+    pub enabled: bool,
+
+    /// Number of failures before opening the circuit
+    pub failure_threshold: u64,
+
+    /// Number of successes to close circuit from half-open state
+    pub success_threshold: u64,
+
+    /// Time to wait before moving from open to half-open state (in seconds)
+    pub timeout_duration_secs: u64,
+
+    /// Time window for counting failures (in seconds)
+    pub window_duration_secs: u64,
+}
+
+impl Default for CircuitBreakerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            failure_threshold: 10,
+            success_threshold: 5,
+            timeout_duration_secs: 15,
+            window_duration_secs: 60,
+        }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -116,6 +149,7 @@ impl Default for Settings {
                 database_directory: Some("./data".to_string()),
                 hdfs: None,
                 s3: None,
+                circuit_breaker: Some(CircuitBreakerConfig::default()),
             },
         }
     }

@@ -1,0 +1,16 @@
+[server]
+host = "127.0.0.1"
+port = 18080
+max_applications = 1000
+
+[history]
+log_directory = "/tmp/spark-events"
+max_applications = 1000
+update_interval_seconds = 60
+max_apps_per_request = 100
+compression_enabled = true
+database_directory = "./test-data"
+
+# Circuit breaker disabled for maximum performance
+[history.circuit_breaker]
+enabled = false
