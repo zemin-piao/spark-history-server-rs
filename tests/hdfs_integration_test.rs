@@ -12,7 +12,6 @@ use spark_history_server::{
 mod test_config;
 use test_config::create_test_config;
 
-
 struct MockHdfsFileReader {
     files: std::collections::HashMap<String, String>,
     directories: std::collections::HashMap<String, Vec<String>>,
@@ -138,7 +137,9 @@ async fn test_hdfs_api_endpoints() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
 
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,
@@ -223,7 +224,9 @@ async fn test_hdfs_compression_support() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
 
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,
@@ -244,7 +247,8 @@ async fn test_real_hdfs_connection() -> Result<()> {
     let namenode_url =
         std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "hdfs://localhost:8020".to_string());
 
-    let hdfs_reader = spark_history_server::storage::file_reader::HdfsFileReader::new_simple(&namenode_url)?;
+    let hdfs_reader =
+        spark_history_server::storage::file_reader::HdfsFileReader::new_simple(&namenode_url)?;
 
     let test_path = Path::new("/tmp/test-file");
     let exists = hdfs_reader.file_exists(test_path).await;

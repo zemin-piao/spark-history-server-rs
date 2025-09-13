@@ -51,7 +51,10 @@ pub trait AnalyticalStorageBackend {
         -> Result<Vec<PerformanceTrend>>;
     async fn get_resource_usage(&self, query: &AnalyticsQuery) -> Result<ResourceUsageSummary>;
     async fn get_task_distribution(&self, query: &AnalyticsQuery) -> Result<TaskDistribution>;
-    async fn get_efficiency_analysis(&self, query: &AnalyticsQuery) -> Result<Vec<EfficiencyAnalysis>>;
+    async fn get_efficiency_analysis(
+        &self,
+        query: &AnalyticsQuery,
+    ) -> Result<Vec<EfficiencyAnalysis>>;
     async fn get_resource_hogs(&self, query: &AnalyticsQuery) -> Result<Vec<ResourceHog>>;
     async fn get_cost_optimization(&self, query: &AnalyticsQuery) -> Result<CostOptimization>;
 

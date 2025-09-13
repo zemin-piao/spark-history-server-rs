@@ -41,7 +41,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize history provider
     let storage_config = StorageConfig::DuckDB {
-        database_path: settings.history.database_directory.as_ref()
+        database_path: settings
+            .history
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,

@@ -470,10 +470,7 @@ async fn test_concurrent_access_safety() -> Result<()> {
                     .await;
 
                 if let Err(e) = result {
-                    eprintln!(
-                        "Writer {} failed on file {}: {:?}",
-                        writer_id, file_id, e
-                    );
+                    eprintln!("Writer {} failed on file {}: {:?}", writer_id, file_id, e);
                     return Err(e);
                 }
 

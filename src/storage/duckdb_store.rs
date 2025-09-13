@@ -312,13 +312,15 @@ impl DuckDbStore {
         match result {
             Ok(db_result) => {
                 // Update counters on successful insert
-                self.event_count.fetch_add(event_count, std::sync::atomic::Ordering::Relaxed);
+                self.event_count
+                    .fetch_add(event_count, std::sync::atomic::Ordering::Relaxed);
                 let current_max = self.max_event_id.load(std::sync::atomic::Ordering::Relaxed);
                 if max_id > current_max {
-                    self.max_event_id.store(max_id, std::sync::atomic::Ordering::Relaxed);
+                    self.max_event_id
+                        .store(max_id, std::sync::atomic::Ordering::Relaxed);
                 }
                 Ok(db_result)
-            },
+            }
             Err(e) => {
                 if e.is_circuit_open() {
                     Err(anyhow!("Database insert failed: circuit breaker is open"))
@@ -804,7 +806,10 @@ impl AnalyticalStorageBackend for DuckDbStore {
         Ok(TaskDistribution::default())
     }
 
-    async fn get_efficiency_analysis(&self, _query: &AnalyticsQuery) -> Result<Vec<EfficiencyAnalysis>> {
+    async fn get_efficiency_analysis(
+        &self,
+        _query: &AnalyticsQuery,
+    ) -> Result<Vec<EfficiencyAnalysis>> {
         // Placeholder implementation - create a default EfficiencyAnalysis
         Ok(vec![EfficiencyAnalysis {
             app_id: "placeholder".to_string(),

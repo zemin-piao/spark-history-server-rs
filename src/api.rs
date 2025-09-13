@@ -98,10 +98,7 @@ async fn list_applications(
     let _min_end_date = parse_date_param(params.min_end_date.as_deref());
     let _max_end_date = parse_date_param(params.max_end_date.as_deref());
 
-    match provider
-        .get_applications(params.limit)
-        .await
-    {
+    match provider.get_applications(params.limit).await {
         Ok(applications) => {
             info!("Returning {} applications", applications.len());
             let apps: Result<Vec<ApplicationInfo>, _> = applications
@@ -131,18 +128,16 @@ async fn get_application(
     info!("GET /api/v1/applications/{}", app_id);
 
     match provider.get_application_summary(&app_id).await {
-        Ok(Some(app_value)) => {
-            match serde_json::from_value::<ApplicationInfo>(app_value) {
-                Ok(app) => {
-                    info!("Found application: {}", app_id);
-                    Ok(Json(app))
-                }
-                Err(e) => {
-                    error!("Failed to deserialize application {}: {}", app_id, e);
-                    Err(StatusCode::INTERNAL_SERVER_ERROR)
-                }
+        Ok(Some(app_value)) => match serde_json::from_value::<ApplicationInfo>(app_value) {
+            Ok(app) => {
+                info!("Found application: {}", app_id);
+                Ok(Json(app))
             }
-        }
+            Err(e) => {
+                error!("Failed to deserialize application {}: {}", app_id, e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        },
         Ok(None) => {
             info!("Application not found: {}", app_id);
             Err(StatusCode::NOT_FOUND)

@@ -234,7 +234,10 @@ async fn main() -> Result<()> {
     // Initialize history provider using the factory
     use crate::storage::{StorageBackendFactory, StorageConfig};
     let storage_config = StorageConfig::DuckDB {
-        database_path: settings.history.database_directory.as_ref()
+        database_path: settings
+            .history
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,

@@ -399,7 +399,9 @@ impl ComprehensiveBenchmark {
         };
 
         let storage_config = StorageConfig::DuckDB {
-            database_path: history_settings.database_directory.as_ref()
+            database_path: history_settings
+                .database_directory
+                .as_ref()
                 .map(|dir| format!("{}/events.db", dir))
                 .unwrap_or_else(|| "./data/events.db".to_string()),
             num_workers: 8,

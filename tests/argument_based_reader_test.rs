@@ -157,32 +157,42 @@ async fn test_history_provider_with_local_reader() -> Result<()> {
 
     // Create history provider using the factory
     let storage_config = StorageConfig::DuckDB {
-        database_path: temp_dir.path().join("test_events.db").to_string_lossy().to_string(),
+        database_path: temp_dir
+            .path()
+            .join("test_events.db")
+            .to_string_lossy()
+            .to_string(),
         num_workers: 8,
         batch_size: 5000,
     };
     let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
 
     // Test application retrieval
-    let applications = history_provider
-        .get_applications(None)
-        .await?;
-
+    let applications = history_provider.get_applications(None).await?;
 
     // Verify that the storage backend is working and returns applications
     // Note: With the new architecture, the storage backend generates synthetic data
     // when no real event logs have been processed, which is expected behavior
-    assert!(!applications.is_empty(), "Storage backend should return applications");
-    
+    assert!(
+        !applications.is_empty(),
+        "Storage backend should return applications"
+    );
+
     let app = &applications[0];
     let app_id = app.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-    let app_name = app.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
-    
+    let app_name = app
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
     // Verify that we get valid application data (even if synthetic)
     assert!(!app_id.is_empty(), "Application should have a valid ID");
     assert!(!app_name.is_empty(), "Application should have a valid name");
-    
-    println!("✅ Local storage backend created successfully with application: {} - {}", app_id, app_name);
+
+    println!(
+        "✅ Local storage backend created successfully with application: {} - {}",
+        app_id, app_name
+    );
 
     println!("✅ HistoryProvider with local reader test passed");
     Ok(())
@@ -215,7 +225,11 @@ async fn test_history_provider_with_hdfs_config() -> Result<()> {
 
     // Create history provider using the factory
     let storage_config = StorageConfig::DuckDB {
-        database_path: temp_dir.path().join("test_events.db").to_string_lossy().to_string(),
+        database_path: temp_dir
+            .path()
+            .join("test_events.db")
+            .to_string_lossy()
+            .to_string(),
         num_workers: 8,
         batch_size: 5000,
     };

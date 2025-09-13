@@ -2,7 +2,11 @@ use anyhow::Result;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use spark_history_server::{api::create_app, models::ApplicationInfo, storage::{StorageBackendFactory, StorageConfig}};
+use spark_history_server::{
+    api::create_app,
+    models::ApplicationInfo,
+    storage::{StorageBackendFactory, StorageConfig},
+};
 
 mod test_config;
 use test_config::create_test_config;
@@ -14,7 +18,9 @@ async fn test_end_to_end_with_real_data() -> Result<()> {
 
     println!("Creating history provider with test data...");
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,
@@ -113,7 +119,9 @@ async fn test_performance_and_concurrent_requests() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
 
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,

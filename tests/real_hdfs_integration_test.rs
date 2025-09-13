@@ -4,9 +4,7 @@ use tokio::time::timeout;
 
 use spark_history_server::{
     config::{HdfsConfig, HistoryConfig, KerberosConfig},
-    storage::{
-        file_reader::{create_file_reader, FileReader, HdfsFileReader},
-    },
+    storage::file_reader::{create_file_reader, FileReader, HdfsFileReader},
 };
 
 /// Real HDFS integration tests
@@ -405,20 +403,38 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
 
     for (i, app) in applications.iter().enumerate() {
         let app_id = app.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-        let app_name = app.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let app_name = app
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
         let empty_vec = vec![];
-        let attempts = app.get("attempts").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
-        
+        let attempts = app
+            .get("attempts")
+            .and_then(|v| v.as_array())
+            .unwrap_or(&empty_vec);
+
         println!("  {}. Application: {}", i + 1, app_id);
         println!("     Name: {}", app_name);
         println!("     Attempts: {}", attempts.len());
 
         if let Some(attempt) = attempts.first() {
-            let start_time = attempt.get("start_time").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let end_time = attempt.get("end_time").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let duration = attempt.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let completed = attempt.get("completed").and_then(|v| v.as_bool()).unwrap_or(false);
-            
+            let start_time = attempt
+                .get("start_time")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let end_time = attempt
+                .get("end_time")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let duration = attempt
+                .get("duration")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let completed = attempt
+                .get("completed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
             println!("     Start Time: {}", start_time);
             println!("     End Time: {}", end_time);
             println!("     Duration: {:.2}s", duration);
@@ -431,16 +447,27 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     if !applications.is_empty() {
         println!("Testing individual application retrieval...");
         let test_app = &applications[0];
-        let test_app_id = test_app.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-        let app_detail = history_provider.get_application_summary(test_app_id).await?;
+        let test_app_id = test_app
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let app_detail = history_provider
+            .get_application_summary(test_app_id)
+            .await?;
 
         match app_detail {
             Some(app) => {
                 let app_id = app.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-                let app_name = app.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let app_name = app
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
                 let empty_vec = vec![];
-        let attempts = app.get("attempts").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
-                
+                let attempts = app
+                    .get("attempts")
+                    .and_then(|v| v.as_array())
+                    .unwrap_or(&empty_vec);
+
                 println!(
                     "✅ Successfully retrieved application details for {}",
                     app_id
@@ -463,10 +490,19 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
         );
 
         for executor in executors.iter().take(3) {
-            let exec_id = executor.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let total_cores = executor.get("total_cores").and_then(|v| v.as_i64()).unwrap_or(0);
-            let max_memory = executor.get("max_memory").and_then(|v| v.as_str()).unwrap_or("0");
-            
+            let exec_id = executor
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let total_cores = executor
+                .get("total_cores")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let max_memory = executor
+                .get("max_memory")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0");
+
             println!(
                 "  Executor {}: {} cores, {} MB memory",
                 exec_id, total_cores, max_memory
@@ -477,7 +513,10 @@ async fn test_real_hdfs_history_provider_integration() -> Result<()> {
     println!();
     println!("Testing analytics backend integration...");
     let stored_apps = history_provider.get_applications(None).await?;
-    println!("Analytics backend contains {} stored applications", stored_apps.len());
+    println!(
+        "Analytics backend contains {} stored applications",
+        stored_apps.len()
+    );
 
     println!();
     println!("Performance Summary:");

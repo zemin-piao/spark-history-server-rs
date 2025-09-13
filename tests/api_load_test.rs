@@ -108,13 +108,17 @@ async fn setup_test_server_with_data(num_events: usize) -> (String, TempDir) {
     };
 
     let storage_config = StorageConfig::DuckDB {
-        database_path: history_settings.database_directory.as_ref()
+        database_path: history_settings
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,
         batch_size: 5000,
     };
-    let history_provider = StorageBackendFactory::create_backend(storage_config).await.unwrap();
+    let history_provider = StorageBackendFactory::create_backend(storage_config)
+        .await
+        .unwrap();
     let app = create_app(history_provider).await.unwrap();
 
     // Start server

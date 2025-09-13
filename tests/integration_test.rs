@@ -30,7 +30,9 @@ async fn test_integration_full_workflow() -> Result<()> {
 
     // Create history provider
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,
@@ -168,7 +170,9 @@ async fn test_date_filtering() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
 
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,
@@ -214,7 +218,9 @@ async fn test_cors_headers() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
 
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,

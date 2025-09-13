@@ -102,27 +102,34 @@ pub async fn cluster_overview(
     State(provider): State<HistoryProvider>,
 ) -> Result<Html<String>, StatusCode> {
     // Fetch real cross-app summary data
-    let cross_app_summary = provider.get_cross_app_summary(&crate::analytics_api::AnalyticsQuery {
-        start_date: None,
-        end_date: None, 
-        limit: None,
-        app_id: None,
-    }).await.map_err(|e| {
-        tracing::error!("Failed to get cross app summary: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let cross_app_summary = provider
+        .get_cross_app_summary(&crate::analytics_api::AnalyticsQuery {
+            start_date: None,
+            end_date: None,
+            limit: None,
+            app_id: None,
+        })
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get cross app summary: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     // Fetch real active applications data
-    let active_applications_values = provider.get_active_applications(Some(10)).await.map_err(|e| {
-        tracing::error!("Failed to get active applications: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-    
+    let active_applications_values =
+        provider
+            .get_active_applications(Some(10))
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to get active applications: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
     let active_applications: Result<Vec<SimpleApplicationSummary>, _> = active_applications_values
         .into_iter()
         .map(serde_json::from_value)
         .collect();
-    
+
     let active_applications = active_applications.map_err(|e| {
         tracing::error!("Failed to deserialize active applications: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -220,11 +227,16 @@ pub async fn optimize_view(
             })
             .count(),
         potential_monthly_savings: {
-            let total_savings = (cost_optimizations.current_cost - cost_optimizations.optimized_cost).max(0.0);
+            let total_savings =
+                (cost_optimizations.current_cost - cost_optimizations.optimized_cost).max(0.0);
             format!("${:.2}", total_savings)
         },
         apps_needing_optimization: 1,
-        high_confidence_optimizations: if cost_optimizations.confidence_score > 80.0 { 1 } else { 0 },
+        high_confidence_optimizations: if cost_optimizations.confidence_score > 80.0 {
+            1
+        } else {
+            0
+        },
     };
 
     // Convert PerformanceTrend to CapacityTrendForTemplate

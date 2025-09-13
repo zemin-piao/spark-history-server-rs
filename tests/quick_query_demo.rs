@@ -10,7 +10,10 @@ use load_test_utils::SyntheticDataGenerator;
 use performance_monitor::PerformanceMonitor;
 use spark_history_server::{
     analytics_api::AnalyticsQuery,
-    storage::{duckdb_store::{DuckDbStore, SparkEvent}, AnalyticalStorageBackend},
+    storage::{
+        duckdb_store::{DuckDbStore, SparkEvent},
+        AnalyticalStorageBackend,
+    },
 };
 
 #[tokio::test]

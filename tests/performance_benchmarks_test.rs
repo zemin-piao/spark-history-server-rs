@@ -45,19 +45,24 @@ async fn benchmark_baseline_performance() -> Result<()> {
         println!("\nTesting batch size: {}", batch_size);
 
         // Create fresh store for each batch size test to avoid conflicts
-        let batch_db_path = temp_dir.path().join(format!("benchmark_baseline_{}.db", batch_idx));
+        let batch_db_path = temp_dir
+            .path()
+            .join(format!("benchmark_baseline_{}.db", batch_idx));
         // Use more workers for better performance
-        let store = Arc::new(DuckDbStore::new_with_config(
-            &batch_db_path.to_string_lossy(),
-            16,  // More workers for better performance
-            1000
-        ).await?);
+        let store = Arc::new(
+            DuckDbStore::new_with_config(
+                &batch_db_path.to_string_lossy(),
+                16, // More workers for better performance
+                1000,
+            )
+            .await?,
+        );
 
         // Generate fresh test data with unique IDs for this batch test
         let batch_test_events = generate_test_events_with_offset(
             config.num_applications,
             config.events_per_application,
-            batch_idx * 1_000_000  // Offset to ensure unique IDs across batch tests
+            batch_idx * 1_000_000, // Offset to ensure unique IDs across batch tests
         );
 
         let start_time = Instant::now();
@@ -129,11 +134,14 @@ async fn benchmark_concurrent_write_performance() -> Result<()> {
     let temp_dir = tempdir()?;
     let db_path = temp_dir.path().join("benchmark_concurrent.db");
     // Use more workers for better concurrent performance
-    let store = Arc::new(DuckDbStore::new_with_config(
-        &db_path.to_string_lossy(),
-        16,  // More workers for concurrent writes
-        500
-    ).await?);
+    let store = Arc::new(
+        DuckDbStore::new_with_config(
+            &db_path.to_string_lossy(),
+            16, // More workers for concurrent writes
+            500,
+        )
+        .await?,
+    );
 
     const EVENTS_PER_WRITER: usize = 1000;
     const BATCH_SIZE: usize = 100;
@@ -148,7 +156,7 @@ async fn benchmark_concurrent_write_performance() -> Result<()> {
         let handle = tokio::spawn(async move {
             let mut writer_events = Vec::new();
             // Ensure unique IDs by using a large offset per writer
-            let id_offset = writer_id * 10_000_000;  // 10M offset per writer
+            let id_offset = writer_id * 10_000_000; // 10M offset per writer
             for event_id in 0..EVENTS_PER_WRITER {
                 let global_id = (id_offset + event_id) as i64;
                 writer_events.push(create_benchmark_event(
@@ -353,11 +361,14 @@ async fn stress_test_production_load() -> Result<()> {
     let temp_dir = tempdir()?;
     let db_path = temp_dir.path().join("stress_test.db");
     // Use optimized configuration for stress testing
-    let store = Arc::new(DuckDbStore::new_with_config(
-        &db_path.to_string_lossy(),
-        32,  // Maximum workers for stress testing
-        500
-    ).await?);
+    let store = Arc::new(
+        DuckDbStore::new_with_config(
+            &db_path.to_string_lossy(),
+            32, // Maximum workers for stress testing
+            500,
+        )
+        .await?,
+    );
 
     // Production-like configuration
     const NUM_APPLICATIONS: usize = 1000; // Scaled down from 40K for CI
@@ -389,7 +400,7 @@ async fn stress_test_production_load() -> Result<()> {
             let mut producer_events = Vec::new();
 
             // Generate events for assigned applications with unique IDs
-            let producer_id_offset = producer_id * 100_000_000;  // 100M offset per producer
+            let producer_id_offset = producer_id * 100_000_000; // 100M offset per producer
             let mut local_event_counter = 0;
             for app_id in start_app..end_app {
                 for _event_id in 0..EVENTS_PER_APP {
@@ -534,9 +545,12 @@ fn generate_large_test_events(
     count: usize,
 ) -> Vec<spark_history_server::storage::duckdb_store::SparkEvent> {
     let mut events = Vec::new();
-    let base_offset = 1_000_000_000;  // 1B offset for large test events
+    let base_offset = 1_000_000_000; // 1B offset for large test events
     for i in 0..count {
-        events.push(create_large_benchmark_event((base_offset + i) as i64, "large_test_app"));
+        events.push(create_large_benchmark_event(
+            (base_offset + i) as i64,
+            "large_test_app",
+        ));
     }
     events
 }

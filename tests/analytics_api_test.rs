@@ -3,7 +3,10 @@ use serde_json::Value;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use spark_history_server::{api::create_app, storage::{HistoryProvider, StorageBackendFactory, StorageConfig}};
+use spark_history_server::{
+    api::create_app,
+    storage::{HistoryProvider, StorageBackendFactory, StorageConfig},
+};
 mod test_config;
 use test_config::create_test_config;
 
@@ -41,7 +44,9 @@ async fn setup_test_environment() -> Result<(HistoryProvider, tempfile::TempDir)
     )?;
 
     let storage_config = StorageConfig::DuckDB {
-        database_path: config.database_directory.as_ref()
+        database_path: config
+            .database_directory
+            .as_ref()
             .map(|dir| format!("{}/events.db", dir))
             .unwrap_or_else(|| "./data/events.db".to_string()),
         num_workers: 8,
