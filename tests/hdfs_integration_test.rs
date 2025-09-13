@@ -6,13 +6,12 @@ use spark_history_server::{
     api::create_app,
     config::HistoryConfig,
     models::ApplicationInfo,
-    storage::{file_reader::FileReader, HistoryProvider},
+    storage::{file_reader::FileReader, StorageBackendFactory, StorageConfig},
 };
 
 mod test_config;
 use test_config::create_test_config;
 
-use spark_history_server::storage::file_reader::HdfsFileReader;
 
 struct MockHdfsFileReader {
     files: std::collections::HashMap<String, String>,
@@ -136,9 +135,16 @@ async fn test_hdfs_integration_with_history_provider() -> Result<()> {
 async fn test_hdfs_api_endpoints() -> Result<()> {
     println!("Testing API endpoints with HDFS backend...");
 
-    let (config, _) = create_test_config();
+    let (config, _temp_dir) = create_test_config();
 
-    let history_provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
 
     let app = create_app(history_provider).await?;
 
@@ -214,9 +220,16 @@ async fn test_hdfs_compression_support() -> Result<()> {
         compressed_content.to_string(),
     );
 
-    let (config, _) = create_test_config();
+    let (config, _temp_dir) = create_test_config();
 
-    let _provider = HistoryProvider::new(config).await?;
+    let storage_config = StorageConfig::DuckDB {
+        database_path: config.database_directory.as_ref()
+            .map(|dir| format!("{}/events.db", dir))
+            .unwrap_or_else(|| "./data/events.db".to_string()),
+        num_workers: 8,
+        batch_size: 5000,
+    };
+    let _provider = StorageBackendFactory::create_backend(storage_config).await?;
 
     println!("✅ HDFS compression support test setup completed");
 
@@ -231,7 +244,7 @@ async fn test_real_hdfs_connection() -> Result<()> {
     let namenode_url =
         std::env::var("HDFS_NAMENODE_URL").unwrap_or_else(|_| "hdfs://localhost:8020".to_string());
 
-    let hdfs_reader = HdfsFileReader::new_simple(&namenode_url)?;
+    let hdfs_reader = spark_history_server::storage::file_reader::HdfsFileReader::new_simple(&namenode_url)?;
 
     let test_path = Path::new("/tmp/test-file");
     let exists = hdfs_reader.file_exists(test_path).await;
