@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use std::collections::HashSet;
 use std::net::SocketAddr;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -245,6 +246,15 @@ async fn main() -> Result<()> {
     };
     let history_provider = StorageBackendFactory::create_backend(storage_config).await?;
 
+    // Start background event processing task
+    let processing_provider = history_provider.clone();
+    let log_directory = settings.history.log_directory.clone();
+    let update_interval = settings.history.update_interval_seconds;
+
+    tokio::spawn(async move {
+        event_processing_task(processing_provider, log_directory, update_interval).await;
+    });
+
     // Create the web application
     let app = create_app(history_provider).await?;
 
@@ -259,4 +269,167 @@ async fn main() -> Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// Background task that continuously scans the log directory and processes events into DuckDB
+async fn event_processing_task(
+    provider: storage::HistoryProvider,
+    log_directory: String,
+    update_interval_seconds: u64,
+) {
+    use std::time::Duration;
+    use tokio::time::sleep;
+
+    info!(
+        "Starting background event processing task for directory: {}",
+        log_directory
+    );
+    info!("Update interval: {} seconds", update_interval_seconds);
+
+    let mut processed_files = HashSet::new();
+    let mut event_id_counter = 1i64;
+
+    loop {
+        match scan_and_process_events(
+            &provider,
+            &log_directory,
+            &mut processed_files,
+            &mut event_id_counter,
+        )
+        .await
+        {
+            Ok(events_processed) => {
+                if events_processed > 0 {
+                    info!("Processed {} events in this scan", events_processed);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Error during event processing: {}", e);
+            }
+        }
+
+        sleep(Duration::from_secs(update_interval_seconds)).await;
+    }
+}
+
+/// Scan the log directory and process new events
+async fn scan_and_process_events(
+    provider: &storage::HistoryProvider,
+    log_directory: &str,
+    processed_files: &mut HashSet<String>,
+    event_id_counter: &mut i64,
+) -> Result<usize> {
+    use std::fs;
+
+    let mut total_events_processed = 0;
+
+    // Read directory contents
+    let entries = match fs::read_dir(log_directory) {
+        Ok(entries) => entries,
+        Err(e) => {
+            tracing::warn!("Failed to read log directory {}: {}", log_directory, e);
+            return Ok(0);
+        }
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => {
+                tracing::warn!("Failed to read directory entry: {}", e);
+                continue;
+            }
+        };
+
+        let path = entry.path();
+
+        // Skip if it's a directory or already processed
+        if path.is_dir() || processed_files.contains(&path.to_string_lossy().to_string()) {
+            continue;
+        }
+
+        // Skip hidden files and non-event files
+        if let Some(file_name) = path.file_name() {
+            let file_name_str = file_name.to_string_lossy();
+            if file_name_str.starts_with('.') {
+                continue;
+            }
+        }
+
+        let file_path = path.to_string_lossy().to_string();
+        info!("Processing event file: {}", file_path);
+
+        match process_event_file(&file_path, provider, event_id_counter).await {
+            Ok(events_count) => {
+                processed_files.insert(file_path.clone());
+                total_events_processed += events_count;
+                info!(
+                    "Successfully processed {} events from {}",
+                    events_count, file_path
+                );
+            }
+            Err(e) => {
+                tracing::error!("Failed to process file {}: {}", file_path, e);
+            }
+        }
+    }
+
+    Ok(total_events_processed)
+}
+
+/// Process a single event file and insert events into DuckDB
+async fn process_event_file(
+    file_path: &str,
+    provider: &storage::HistoryProvider,
+    event_id_counter: &mut i64,
+) -> Result<usize> {
+    use crate::storage::SparkEvent;
+    use serde_json::Value;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+
+    let mut events = Vec::new();
+
+    // Extract app_id from filename (e.g., "app-20241201-160000-hog" from the filename)
+    let app_id = std::path::Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    for line in reader.lines() {
+        let line = line?;
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        match serde_json::from_str::<Value>(trimmed) {
+            Ok(json_event) => {
+                match SparkEvent::from_json(&json_event, &app_id, *event_id_counter) {
+                    Ok(spark_event) => {
+                        events.push(spark_event);
+                        *event_id_counter += 1;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse event from {}: {}", file_path, e);
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to parse JSON from {}: {}", file_path, e);
+            }
+        }
+    }
+
+    // Insert events in batch
+    if !events.is_empty() {
+        provider.insert_events_batch(events.clone()).await?;
+    }
+
+    Ok(events.len())
 }

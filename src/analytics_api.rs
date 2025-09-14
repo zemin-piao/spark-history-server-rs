@@ -147,9 +147,11 @@ pub struct CostOptimization {
 pub enum OptimizationType {
     ReduceExecutors,
     ReduceMemory,
+    IncreaseMemory,
     OptimizePartitioning,
     EnableSpotInstances,
     ScheduleOffPeak,
+    Maintain,
 }
 
 impl std::fmt::Display for OptimizationType {
@@ -157,9 +159,11 @@ impl std::fmt::Display for OptimizationType {
         match self {
             OptimizationType::ReduceExecutors => write!(f, "Reduce Executors"),
             OptimizationType::ReduceMemory => write!(f, "Reduce Memory"),
+            OptimizationType::IncreaseMemory => write!(f, "Increase Memory"),
             OptimizationType::OptimizePartitioning => write!(f, "Optimize Partitioning"),
             OptimizationType::EnableSpotInstances => write!(f, "Enable Spot Instances"),
             OptimizationType::ScheduleOffPeak => write!(f, "Schedule Off-Peak"),
+            OptimizationType::Maintain => write!(f, "Maintain Current Configuration"),
         }
     }
 }
