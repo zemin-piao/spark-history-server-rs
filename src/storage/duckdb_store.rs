@@ -59,6 +59,12 @@ impl DuckDbStore {
         circuit_breaker_config: Option<crate::config::CircuitBreakerConfig>,
     ) -> Result<Self> {
         let path = Path::new(db_path);
+
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
         // Initialize database schema with a temporary connection
         let temp_conn = Connection::open(path)?;
         Self::initialize_schema(&temp_conn).await?;

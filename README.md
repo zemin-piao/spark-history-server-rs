@@ -31,16 +31,27 @@ A **high-performance, analytics-first** Spark History Server built in Rust. Unli
 
 ## 🚀 Quick Start
 
-### 1. Run the Server
+### Prerequisites
+
+Before starting, ensure you have:
+- Rust toolchain installed (1.70+): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+### 1. Build the Server
 
 ```bash
-# Download and build
+# Clone the repository
 git clone https://github.com/your-repo/spark-history-server-rs
 cd spark-history-server-rs
-cargo build --release
 
+# Build the release binary
+cargo build --release
+```
+
+### 2. Run the Server
+
+```bash
 # Start with local Spark events
-./target/release/spark-history-server --log-directory ./spark-events
+./target/release/spark-history-server --log-directory ~/logs/
 
 # Or with HDFS
 ./target/release/spark-history-server \
@@ -64,7 +75,18 @@ cargo build --release
   --log-directory /hdfs/spark-events
 ```
 
-### 2. Access the Dashboard
+**Note:** The server automatically creates the database directory (`./data/`) and log directory if they don't exist. You should see log messages like:
+```
+INFO Starting Spark History Server
+INFO Log directory: /Users/user/logs/
+INFO Storage backend: Local filesystem
+INFO DuckDB workers initialized at: "./data/events.db" with 8 workers
+INFO Server listening on http://0.0.0.0:18080
+```
+
+If your log directory is empty, the server will start successfully and wait for event logs to be added.
+
+### 3. Access the Dashboard
 
 Open your browser and navigate to `http://localhost:18080` to access the web dashboard.
 
