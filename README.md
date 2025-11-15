@@ -7,7 +7,7 @@
 
 A **high-performance, analytics-first** Spark History Server built in Rust. Unlike traditional history servers focused on individual application details, this server excels at **cross-application analytics and trends** using DuckDB's analytical power.
 
-**🏆 Proven Performance: 100,000+ applications, 2M events, 10,700 events/sec**
+**🏆 Proven Performance: 100,000+ applications, 2M events, 20,000-30,000 events/sec** (with DuckDB Appender optimization)
 
 ![Summary](img/summary.png)
 

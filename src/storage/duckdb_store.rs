@@ -242,7 +242,7 @@ impl DuckDbStore {
         info!("Database worker {} shutting down", worker_id);
     }
 
-    /// Worker-specific batch insert implementation
+    /// Worker-specific batch insert implementation with intelligent routing
     async fn worker_insert_batch(
         conn: &Connection,
         events: Vec<SparkEvent>,
@@ -252,11 +252,11 @@ impl DuckDbStore {
             return Ok(());
         }
 
-        let _start_time = std::time::Instant::now();
-
-        // Use COPY for much faster bulk inserts
+        // Intelligent routing based on batch size:
+        // - Small batches (≤100): Standard prepared statements (lowest overhead)
+        // - Large batches (>100): DuckDB Appender API (maximum throughput)
         if events.len() > 100 {
-            Self::bulk_insert_with_copy_worker(conn, events, worker_id).await
+            Self::bulk_insert_with_appender_worker(conn, events, worker_id).await
         } else {
             Self::standard_batch_insert_worker(conn, events, worker_id).await
         }
@@ -333,67 +333,6 @@ impl DuckDbStore {
         }
     }
 
-    /// Worker-specific high-performance bulk insert using DuckDB's COPY FROM functionality
-    async fn bulk_insert_with_copy_worker(
-        conn: &Connection,
-        events: Vec<SparkEvent>,
-        worker_id: usize,
-    ) -> Result<()> {
-        let start_time = std::time::Instant::now();
-
-        // Use prepared statements for better performance with worker-dedicated connections
-        let mut stmt = conn
-            .prepare(
-                r#"
-            INSERT INTO events (
-                id, app_id, event_type, timestamp, raw_data, 
-                job_id, stage_id, task_id, duration_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
-            )
-            .map_err(|e| anyhow!("Worker {}: Failed to prepare statement: {}", worker_id, e))?;
-
-        // Use transaction for batch insert
-        conn.execute_batch("BEGIN TRANSACTION")?;
-
-        let insert_result = (|| -> Result<()> {
-            for event in &events {
-                stmt.execute(params![
-                    event.id,
-                    &event.app_id,
-                    &event.event_type,
-                    &event.timestamp,
-                    &event.raw_data.to_string(),
-                    event.job_id,
-                    event.stage_id,
-                    event.task_id,
-                    event.duration_ms,
-                ])?;
-            }
-            Ok(())
-        })();
-
-        match insert_result {
-            Ok(()) => {
-                conn.execute_batch("COMMIT")?;
-                let duration = start_time.elapsed();
-                let throughput = events.len() as f64 / duration.as_secs_f64();
-                info!(
-                    "WORKER_{}: Successfully inserted {} events in {:?} ({:.0} events/sec)",
-                    worker_id,
-                    events.len(),
-                    duration,
-                    throughput
-                );
-                Ok(())
-            }
-            Err(e) => {
-                conn.execute_batch("ROLLBACK")?;
-                Err(anyhow!("Worker {}: Insert failed: {}", worker_id, e))
-            }
-        }
-    }
-
     /// Worker-specific standard batch insert using prepared statements
     async fn standard_batch_insert_worker(
         conn: &Connection,
@@ -406,7 +345,7 @@ impl DuckDbStore {
             .prepare(
                 r#"
             INSERT INTO events (
-                id, app_id, event_type, timestamp, raw_data, 
+                id, app_id, event_type, timestamp, raw_data,
                 job_id, stage_id, task_id, duration_ms
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
@@ -450,6 +389,60 @@ impl DuckDbStore {
                 Err(anyhow!("Worker {}: Insert failed: {}", worker_id, e))
             }
         }
+    }
+
+    /// Worker-specific Appender-based bulk insert using DuckDB's optimized API
+    /// This is the FASTEST path for medium-to-large batches (100+ events)
+    /// Uses DuckDB's native Appender for columnar bulk inserts
+    async fn bulk_insert_with_appender_worker(
+        conn: &Connection,
+        events: Vec<SparkEvent>,
+        worker_id: usize,
+    ) -> Result<()> {
+        let start_time = std::time::Instant::now();
+
+        if events.is_empty() {
+            return Ok(());
+        }
+
+        // Create DuckDB Appender - optimized for bulk inserts
+        let mut appender = conn
+            .appender("events")
+            .map_err(|e| anyhow!("Worker {}: Failed to create appender: {}", worker_id, e))?;
+
+        // Append rows using DuckDB's optimized columnar API
+        for event in &events {
+            appender
+                .append_row(params![
+                    event.id,
+                    &event.app_id,
+                    &event.event_type,
+                    &event.timestamp,
+                    &event.raw_data.to_string(),
+                    event.job_id,
+                    event.stage_id,
+                    event.task_id,
+                    event.duration_ms,
+                ])
+                .map_err(|e| anyhow!("Worker {}: Appender row failed: {}", worker_id, e))?;
+        }
+
+        // Flush all rows at once (columnar write)
+        appender
+            .flush()
+            .map_err(|e| anyhow!("Worker {}: Appender flush failed: {}", worker_id, e))?;
+
+        let duration = start_time.elapsed();
+        let throughput = events.len() as f64 / duration.as_secs_f64();
+        info!(
+            "APPENDER_WORKER_{}: Successfully inserted {} events in {:?} ({:.0} events/sec) [OPTIMIZED]",
+            worker_id,
+            events.len(),
+            duration,
+            throughput
+        );
+
+        Ok(())
     }
 
     /// Get all applications with filtering support  
