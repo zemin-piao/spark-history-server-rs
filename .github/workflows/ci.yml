@@ -11,6 +11,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation to save disk space
+  CARGO_NET_RETRY: 10
+  RUSTFLAGS: "-C debuginfo=0"  # Disable debug info to reduce binary size
 
 jobs:
   test:
@@ -19,21 +22,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free Disk Space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          docker system prune -af || true
+          echo "Disk space after cleanup:"
+          df -h
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo dependencies
-        uses: actions/cache@v3
+      - name: Cache cargo dependencies (optimized)
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          # Only cache dependencies, not test binaries
+          cache-targets: "false"
+          shared-key: "ci"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -41,13 +54,57 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Run CI test suite (no Docker dependencies)
+      - name: Run unit and integration tests (exclude large-scale tests)
         run: |
-          chmod +x scripts/test-ci.sh
-          ./scripts/test-ci.sh
+          # Run lib tests
+          cargo test --lib --verbose
+
+          # Run integration tests except large_scale_test
+          cargo test --test integration_test
+          cargo test --test analytics_api_test
+          cargo test --test hdfs_integration_test
+          cargo test --test incremental_scan_test
+          cargo test --test batch_writer_debug_test
+          cargo test --test argument_based_reader_test
 
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --bin spark-history-server
+
+  # Large-scale performance tests (only run on demand)
+  large-scale-tests:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[run-large-scale]') || github.event_name == 'schedule'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free Disk Space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          docker system prune -af || true
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "false"
+          shared-key: "large-scale"
+
+      - name: Run large-scale tests in release mode
+        run: |
+          # Use release mode to reduce binary size
+          cargo test --release --test large_scale_test
+          cargo test --release --test load_test_utils
 
   # Optional: Integration tests with Docker (can be run manually or on schedule)
   integration-tests:
@@ -80,19 +137,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          docker system prune -af || true
+          df -h
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo dependencies
-        uses: actions/cache@v3
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          cache-targets: "false"
+          shared-key: "integration"
 
       - name: Wait for services
         run: |

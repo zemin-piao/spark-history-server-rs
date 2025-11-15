@@ -8,7 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 1
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation to save disk space
+  RUSTFLAGS: "-C debuginfo=0"  # Disable debug info to reduce binary size
   # DuckDB extension settings
   DUCKDB_EXTENSION_DIRECTORY: /tmp/duckdb_extensions
   ENABLE_DB_CLEANUP: true
@@ -19,21 +20,36 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Free Disk Space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          docker system prune -af || true
+          echo "Disk space after cleanup:"
+          df -h
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          
-      - name: Cache Rust dependencies
+
+      - name: Cache Rust dependencies (optimized)
         uses: Swatinem/rust-cache@v2
         with:
           # Cache DuckDB extensions directory
           cache-directories: /tmp/duckdb_extensions/
-          # Cache all crates in workspace
-          cache-all-crates: true
-          # Save cache even on failure
-          save-if: true
+          # Don't cache test binaries to save space
+          cache-targets: "false"
+          # Shared cache key
+          shared-key: "rust"
+          # Only save cache on main branch
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Setup DuckDB extensions directory
         run: |
